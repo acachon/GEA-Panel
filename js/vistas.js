@@ -9,9 +9,13 @@
   function pintarMapa(el, D, f, capas) {
     G.destruirMapa();
     const m = L.map(el); mapaActual = m;
-    const aerea = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' }).addTo(m);
+    // Aérea: ortofoto del PNOA (IGN España), sin nubes y con detalle de 25 cm; es el fondo por defecto (la misma que usa la app)
+    const aerea = L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', { layers: 'OI.OrthoimageCoverage', format: 'image/jpeg', version: '1.3.0', maxZoom: 21, maxNativeZoom: 20,
+      attribution: 'PNOA © <a href="https://www.scne.es/" target="_blank" rel="noopener">IGN</a> (CC BY 4.0)' }).addTo(m);
+    // Satélite: Esri World Imagery (en zonas rurales solo hay imagen hasta el zoom 18)
+    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
     const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-    L.control.layers({ 'Aérea': aerea, 'Mapa': osm }, null, { position: 'topright' }).addTo(m);
+    L.control.layers({ 'Aérea': aerea, 'Satélite': sat, 'Mapa': osm }, null, { position: 'topright' }).addTo(m);
     const b = [], quien = a => (!f.emp || a.nombre === f.emp);
     D.acts.filter(a => quien(a) && (!f.lab || a.L.k === f.lab) && !(f.lab && a.L.jornada)).forEach(a => {
       const l = (D.pts.get(a.id) || []).map(p => [p.lat, p.lon]); if (!l.length) return;

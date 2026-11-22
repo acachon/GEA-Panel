@@ -65,7 +65,7 @@ js/demo.js        datos de ejemplo
 servicio/LEEME.md cambio opcional en el servicio de Apps Script
 ```
 
-Mapas: Leaflet + imágenes de Esri World Imagery y OpenStreetMap (se cargan desde Internet).
+Mapas: Leaflet + imágenes de ortofoto del PNOA (IGN), Esri World Imagery y OpenStreetMap (se cargan desde Internet).
 
 ## Pendiente (Fase 2)
 
