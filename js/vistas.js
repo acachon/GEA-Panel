@@ -5,18 +5,56 @@
 
   /* ---------- Mapa (Leaflet) ---------- */
   let mapaActual = null;
-  G.destruirMapa = () => { if (mapaActual) { mapaActual.remove(); mapaActual = null; } };
+  G.destruirMapa = () => { if (mapaActual) { mapaActual.remove(); mapaActual = null; } document.body.style.overflow = ''; };
+  // Escape cierra la pantalla completa del mapa
+  document.addEventListener('keydown', e => {
+    const x = e.key === 'Escape' && document.querySelector('.mapa.completa');
+    if (x) { x.classList.remove('completa'); document.body.style.overflow = ''; if (mapaActual) setTimeout(() => mapaActual.invalidateSize(), 50); }
+  });
+  const ICO_YO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>';
+  const ICO_TODO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   function pintarMapa(el, D, f, capas) {
     G.destruirMapa();
     const m = L.map(el); mapaActual = m;
     // Aérea: ortofoto del PNOA (IGN España), sin nubes y con detalle de 25 cm; es el fondo por defecto (la misma que usa la app)
     const aerea = L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', { layers: 'OI.OrthoimageCoverage', format: 'image/jpeg', version: '1.3.0', maxZoom: 21, maxNativeZoom: 20,
-      attribution: 'PNOA © <a href="https://www.scne.es/" target="_blank" rel="noopener">IGN</a> (CC BY 4.0)' }).addTo(m);
+      attribution: 'PNOA © <a href="https://www.scne.es/" target="_blank" rel="noopener">IGN</a> (CC BY 4.0)' });
     // Satélite: Esri World Imagery (en zonas rurales solo hay imagen hasta el zoom 18)
     const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
     const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-    L.control.layers({ 'Aérea': aerea, 'Satélite': sat, 'Mapa': osm }, null, { position: 'topright' }).addTo(m);
+    const control = (pos, clase, crear) => {
+      const C = L.Control.extend({ options: { position: pos }, onAdd() { const c = L.DomUtil.create('div', clase); crear(c); L.DomEvent.disableClickPropagation(c); return c; } });
+      new C().addTo(m);
+    };
+    // Pantalla completa: ⤢ la abre, ✕ (o Escape) la cierra
+    control('topright', 'leaflet-bar completo', c => {
+      const a = L.DomUtil.create('a', '', c); a.href = '#'; a.setAttribute('role', 'button');
+      const etiqueta = () => { const v = el.classList.contains('completa'); a.textContent = v ? '✕' : '⤢'; a.title = v ? 'Salir de pantalla completa' : 'Mapa a pantalla completa'; a.setAttribute('aria-label', a.title); };
+      L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); const v = !el.classList.contains('completa'); el.classList.toggle('completa', v); document.body.style.overflow = v ? 'hidden' : ''; etiqueta(); setTimeout(() => m.invalidateSize(), 50); });
+      m.on('resize', etiqueta); etiqueta();
+    });
+    document.body.style.overflow = el.classList.contains('completa') ? 'hidden' : '';
+    // Fondo elegido: se recuerda en este navegador (por defecto, Aérea)
+    const fondos = { 'Aérea': aerea, 'Satélite': sat, 'Mapa': osm };
+    let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
+    (fondos[fondo] || aerea).addTo(m);
+    L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
+    m.on('baselayerchange', e => { try { localStorage.setItem('gea.panel.fondo', e.name); } catch (e2) { /* sin almacenamiento */ } });
     const b = [], quien = a => (!f.emp || a.nombre === f.emp);
+    const yo = L.layerGroup().addTo(m), aviso = t => L.popup().setLatLng(m.getCenter()).setContent(t).openOn(m);
+    // Ir a mi ubicación (punto azul) y Ver todo (encuadra recorridos, posiciones e incidencias dibujados)
+    control('topleft', 'leaflet-bar ubic', c => [['Ir a mi ubicación actual', ICO_YO, () => {
+      if (!('geolocation' in navigator)) { aviso('Este navegador no puede dar tu ubicación.'); return; }
+      navigator.geolocation.getCurrentPosition(p => {
+        const pos = [p.coords.latitude, p.coords.longitude]; yo.clearLayers();
+        if (p.coords.accuracy <= 100) L.circle(pos, { radius: p.coords.accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12 }).addTo(yo);
+        L.circleMarker(pos, { radius: 8, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).bindTooltip('Estás aquí (±' + Math.round(p.coords.accuracy) + ' m)').addTo(yo);
+        m.setView(pos, Math.max(m.getZoom(), 17));
+      }, () => aviso('No se ha podido obtener tu ubicación.'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    }], ['Ver todo lo marcado en el mapa', ICO_TODO, () => { if (b.length) m.fitBounds(L.latLngBounds(b).pad(0.3), { maxZoom: 18 }); else aviso('No hay nada marcado con ubicación.'); }]].forEach(([t, svg, accion]) => {
+      const a = L.DomUtil.create('a', '', c); a.href = '#'; a.setAttribute('role', 'button'); a.title = t; a.setAttribute('aria-label', t); a.innerHTML = svg;
+      L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); accion(); });
+    }));
     D.acts.filter(a => quien(a) && (!f.lab || a.L.k === f.lab) && !(f.lab && a.L.jornada)).forEach(a => {
       const l = (D.pts.get(a.id) || []).map(p => [p.lat, p.lon]); if (!l.length) return;
       if (a.L.jornada ? !capas.jornada : !capas.recorridos) return;

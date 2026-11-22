@@ -74,3 +74,7 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 .mk .i{width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-bottom:24px solid #f2b600;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));position:relative}
 .cargando{opacity:.55;pointer-events:none}
 @media (max-width:900px){#nav{flex:1 1 100%;flex-direction:row;flex-wrap:wrap;align-items:center}#nav .finca,#nav .pie,#nav .sp{display:none}#main{padding:16px}}
+/* Controles del mapa (iguales que en la pestaña Supervisor de la app) */
+.mapa.completa{position:fixed!important;inset:0;height:auto;z-index:2500;border:0;border-radius:0}
+.leaflet-container .completo a{display:flex;align-items:center;justify-content:center;font:700 20px var(--display,inherit)}
+.leaflet-container .ubic a{display:flex;align-items:center;justify-content:center}
