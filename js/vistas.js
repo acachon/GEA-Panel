@@ -38,8 +38,17 @@
     const fondos = { 'Aérea': aerea, 'Satélite': sat, 'Mapa': osm };
     let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
     (fondos[fondo] || aerea).addTo(m);
-    L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
-    m.on('baselayerchange', e => { try { localStorage.setItem('gea.panel.fondo', e.name); } catch (e2) { /* sin almacenamiento */ } });
+    // Catastro: parcelas (con su referencia) de la Dirección General del Catastro (WMS INSPIRE), como capa que se superpone al fondo
+    const catastro = L.tileLayer.wms('https://ovc.catastro.meh.es/cartografia/INSPIRE/spadgcwms.aspx', { layers: 'CP.CadastralParcel', format: 'image/png', transparent: true, version: '1.1.1', minZoom: 13, maxZoom: 21, className: 'cat-lineas',
+      attribution: '© <a href="https://www.sedecatastro.gob.es/" target="_blank" rel="noopener">Dirección General del Catastro</a>' });
+    let conCatastro = false; try { conCatastro = localStorage.getItem('gea.panel.catastro') === '1'; } catch (e) { /* sin almacenamiento */ }
+    if (conCatastro) catastro.addTo(m);
+    // Las líneas del Catastro son negras: sobre imagen aérea se pintan en blanco (en el mapa de calles, se dejan negras)
+    const tinta = n => el.classList.toggle('fondo-mapa', n === 'Mapa'); tinta(fondos[fondo] ? fondo : 'Aérea');
+    L.control.layers(fondos, { 'Catastro (parcelas)': catastro }, { position: 'topright' }).addTo(m);
+    m.on('baselayerchange', e => { tinta(e.name); try { localStorage.setItem('gea.panel.fondo', e.name); } catch (e2) { /* sin almacenamiento */ } });
+    const marcaCatastro = v => { try { localStorage.setItem('gea.panel.catastro', v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } };
+    m.on('overlayadd', e => { if (e.layer === catastro) marcaCatastro(true); }); m.on('overlayremove', e => { if (e.layer === catastro) marcaCatastro(false); });
     const b = [], quien = a => (!f.emp || a.nombre === f.emp);
     const yo = L.layerGroup().addTo(m), aviso = t => L.popup().setLatLng(m.getCenter()).setContent(t).openOn(m);
     // Ir a mi ubicación (punto azul) y Ver todo (encuadra recorridos, posiciones e incidencias dibujados)

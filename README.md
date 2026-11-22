@@ -65,10 +65,10 @@ js/demo.js        datos de ejemplo
 servicio/LEEME.md cambio opcional en el servicio de Apps Script
 ```
 
-Mapas: Leaflet + imágenes de ortofoto del PNOA (IGN), Esri World Imagery y OpenStreetMap (se cargan desde Internet).
+Mapas: Leaflet + imágenes de ortofoto del PNOA (IGN), Esri World Imagery y OpenStreetMap, con las parcelas del Catastro (WMS INSPIRE) como capa opcional (se cargan desde Internet).
 
 ## Pendiente (Fase 2)
 
-- Reparto de horas por parcela y subparcela (hay que importar las parcelas del Catastro/SIGPAC).
+- Reparto de horas por parcela y subparcela (el mapa ya muestra las parcelas del Catastro como imagen; falta importarlas como polígonos).
 - Costes por labor y rendimiento (la app no recoge todavía precios por hora ni pesos de cosecha).
 - Informes descargables.

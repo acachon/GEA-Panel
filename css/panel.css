@@ -78,3 +78,6 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 .mapa.completa{position:fixed!important;inset:0;height:auto;z-index:2500;border:0;border-radius:0}
 .leaflet-container .completo a{display:flex;align-items:center;justify-content:center;font:700 20px var(--display,inherit)}
 .leaflet-container .ubic a{display:flex;align-items:center;justify-content:center}
+/* Capa del Catastro: líneas blancas sobre imagen aérea o satélite */
+.cat-lineas{filter:invert(1) drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.mapa.fondo-mapa .cat-lineas{filter:none}
