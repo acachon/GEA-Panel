@@ -65,7 +65,7 @@ js/demo.js        datos de ejemplo
 servicio/LEEME.md cambio opcional en el servicio de Apps Script
 ```
 
-Mapas: Leaflet + imágenes de ortofoto del PNOA (IGN), Esri World Imagery y OpenStreetMap, con las parcelas del Catastro (WMS INSPIRE) como capa opcional (se cargan desde Internet).
+Mapas: Leaflet + imágenes de ortofoto del PNOA (IGN), Esri World Imagery y OpenStreetMap, con dos capas opcionales del Catastro: Parcelas (con su referencia) y Cultivos (subparcelas) (se cargan desde Internet).
 
 ## Pendiente (Fase 2)
 

@@ -55,10 +55,16 @@
     if (conCatastro) catastro.addTo(m);
     // Las líneas del Catastro son negras: sobre imagen aérea se pintan en blanco (en el mapa de calles, se dejan negras)
     const tinta = n => el.classList.toggle('fondo-mapa', n === 'Mapa'); tinta(fondos[fondo] ? fondo : 'Aérea');
-    L.control.layers(fondos, { 'Catastro (parcelas)': catastro }, { position: 'topright' }).addTo(m);
+    // Cultivos: subparcelas del Catastro (cada recinto de cultivo o aprovechamiento dentro de la parcela, con su clave de cultivo)
+    const cultivos = L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { layers: 'SUBPARCE,TXTSUBPARCE', format: 'image/png', transparent: true, version: '1.1.1', minZoom: 14, maxZoom: 21, className: 'cat-lineas',
+      attribution: '© <a href="https://www.sedecatastro.gob.es/" target="_blank" rel="noopener">Dirección General del Catastro</a>' });
+    let conCultivos = false; try { conCultivos = localStorage.getItem('gea.panel.cultivos') === '1'; } catch (e) { /* sin almacenamiento */ }
+    if (conCultivos) cultivos.addTo(m);
+    L.control.layers(fondos, { 'Catastro (parcelas)': catastro, 'Catastro (cultivos)': cultivos }, { position: 'topright' }).addTo(m);
     m.on('baselayerchange', e => { tinta(e.name); try { localStorage.setItem('gea.panel.fondo', e.name); } catch (e2) { /* sin almacenamiento */ } });
-    const marcaCatastro = v => { try { localStorage.setItem('gea.panel.catastro', v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } };
-    m.on('overlayadd', e => { if (e.layer === catastro) marcaCatastro(true); }); m.on('overlayremove', e => { if (e.layer === catastro) marcaCatastro(false); });
+    const marca = (clave, v) => { try { localStorage.setItem(clave, v ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } };
+    const claveDe = l => l === catastro ? 'gea.panel.catastro' : l === cultivos ? 'gea.panel.cultivos' : null;
+    m.on('overlayadd', e => { const k = claveDe(e.layer); if (k) marca(k, true); }); m.on('overlayremove', e => { const k = claveDe(e.layer); if (k) marca(k, false); });
     const b = [], quien = a => (!f.emp || a.nombre === f.emp);
     const yo = L.layerGroup().addTo(m), aviso = t => L.popup().setLatLng(m.getCenter()).setContent(t).openOn(m);
     // Ir a mi ubicación (punto azul) y Ver todo (encuadra recorridos, posiciones e incidencias dibujados)
