@@ -2,7 +2,7 @@
 (function () {
   const G = GEA, esc = G.esc, $ = s => document.querySelector(s), CLAVE_LS = 'gea.panel.cfg';
   const hoy = () => G.dayKey(new Date());
-  const porDefecto = { url: '', clave: '', jornalH: 5, finHora: '17:00', prueba: true, demo: false };
+  const porDefecto = { url: 'https://script.google.com/macros/s/AKfycbxQAaU7u7FpRTmCC81dQ8Un6UoWvh1o9x_qtkixPX6o35IMhniYSnMiPZEbFGGMccbOPw/exec', clave: '', jornalH: 5, finHora: '17:00', prueba: true, demo: false };
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
