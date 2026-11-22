@@ -9,7 +9,7 @@
   // Escape cierra la pantalla completa del mapa
   document.addEventListener('keydown', e => {
     const x = e.key === 'Escape' && document.querySelector('.mapa.completa');
-    if (x) { x.classList.remove('completa'); document.body.style.overflow = ''; if (mapaActual) setTimeout(() => mapaActual.invalidateSize(), 50); }
+    if (x) { x.classList.remove('completa'); document.body.style.overflow = ''; if (mapaActual) { const mm = mapaActual; setTimeout(() => { if (mapaActual === mm) mm.invalidateSize(); }, 50); } }
   });
   // Recorrido / Área visibles en el mapa (se conserva al repintar)
   const verMapa = { recorrido: true, area: true };
@@ -40,7 +40,7 @@
     control('topright', 'leaflet-bar completo', c => {
       const a = L.DomUtil.create('a', '', c); a.href = '#'; a.setAttribute('role', 'button');
       const etiqueta = () => { const v = el.classList.contains('completa'); a.textContent = v ? '✕' : '⤢'; a.title = v ? 'Salir de pantalla completa' : 'Mapa a pantalla completa'; a.setAttribute('aria-label', a.title); };
-      L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); const v = !el.classList.contains('completa'); el.classList.toggle('completa', v); document.body.style.overflow = v ? 'hidden' : ''; etiqueta(); setTimeout(() => m.invalidateSize(), 50); });
+      L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); const v = !el.classList.contains('completa'); el.classList.toggle('completa', v); document.body.style.overflow = v ? 'hidden' : ''; etiqueta(); setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 50); });
       m.on('resize', etiqueta); etiqueta();
     });
     document.body.style.overflow = el.classList.contains('completa') ? 'hidden' : '';
@@ -108,7 +108,7 @@
       });
     }
     if (b.length) m.fitBounds(b, { padding: [30, 30], maxZoom: 18 }); else m.setView(BASE, 15);
-    setTimeout(() => m.invalidateSize(), 80);
+    setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 80);
   }
   const capasPor = { recorridos: true, jornada: false, posicion: true, incidencias: true };
   const refDia = () => { const d = G.periodo(); return d[d.length - 1]; };
