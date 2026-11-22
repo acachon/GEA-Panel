@@ -11,7 +11,17 @@
     const x = e.key === 'Escape' && document.querySelector('.mapa.completa');
     if (x) { x.classList.remove('completa'); document.body.style.overflow = ''; if (mapaActual) setTimeout(() => mapaActual.invalidateSize(), 50); }
   });
-  const ICO_YO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>';
+  // Recorrido / Área visibles en el mapa (se conserva al repintar)
+  const verMapa = { recorrido: true, area: true };
+  // Envolvente convexa de unos puntos [lat,lon] (cadena monótona): el polígono más sencillo que los contiene
+  function envolvente(pts) {
+    const u = [...new Map(pts.map(q => [q.join(), q])).values()].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    if (u.length < 3) return u;
+    const cruz = (o, a, b) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+    const medio = orden => { const h = []; orden.forEach(q => { while (h.length > 1 && cruz(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); }); h.pop(); return h; };
+    return medio(u).concat(medio(u.slice().reverse()));
+  }
+  const ICO_YO ='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>';
   const ICO_TODO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   function pintarMapa(el, D, f, capas) {
     G.destruirMapa();
@@ -64,12 +74,21 @@
       const a = L.DomUtil.create('a', '', c); a.href = '#'; a.setAttribute('role', 'button'); a.title = t; a.setAttribute('aria-label', t); a.innerHTML = svg;
       L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); accion(); });
     }));
+    // Recorrido / Área (como en la pestaña Supervisor de la app): el recorrido son las líneas GPS y el área, el polígono más pequeño que contiene los puntos de cada actividad
+    const pol = L.layerGroup(), lin = L.layerGroup();
+    const aplicarVista = () => { [[pol, verMapa.area], [lin, verMapa.recorrido]].forEach(([g, v]) => { if (v) g.addTo(m); else m.removeLayer(g); }); };
+    control('bottomleft', 'vistamapa', c => [['recorrido', 'Recorrido'], ['area', 'Área']].forEach(([k, t]) => {
+      const bt = L.DomUtil.create('button', '', c); bt.type = 'button'; bt.textContent = t; bt.setAttribute('aria-pressed', verMapa[k]);
+      L.DomEvent.on(bt, 'click', e => { L.DomEvent.stop(e); verMapa[k] = !verMapa[k]; bt.setAttribute('aria-pressed', verMapa[k]); aplicarVista(); });
+    }));
+    aplicarVista();
     D.acts.filter(a => quien(a) && (!f.lab || a.L.k === f.lab) && !(f.lab && a.L.jornada)).forEach(a => {
       const l = (D.pts.get(a.id) || []).map(p => [p.lat, p.lon]); if (!l.length) return;
+      if (!a.L.jornada && !a.L.pausa) { const h = envolvente(l); if (h.length >= 3) L.polygon(h, { color: a.L.c, weight: 3, opacity: 1, fillColor: a.L.c, fillOpacity: .5, interactive: false }).addTo(pol); }
+      b.push(...l);
       if (a.L.jornada ? !capas.jornada : !capas.recorridos) return;
       L.polyline(l, { color: a.L.jornada ? '#ffffff' : a.L.c, weight: a.L.jornada ? 2 : 5, opacity: a.L.jornada ? .7 : .95, dashArray: a.L.jornada ? '2 7' : null })
-        .bindTooltip(esc(a.nombre) + ' · ' + esc(a.actividad) + ' · ' + G.hhmm(a.t)).addTo(m);
-      b.push(...l);
+        .bindTooltip(esc(a.nombre) + ' · ' + esc(a.actividad) + ' · ' + G.hhmm(a.t)).addTo(lin);
     });
     if (capas.posicion) {
       D.empleados.filter(e => !f.emp || e === f.emp).forEach(e => {

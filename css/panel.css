@@ -81,3 +81,9 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 /* Capa del Catastro: líneas blancas sobre imagen aérea o satélite */
 .cat-lineas{filter:invert(1) drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .mapa.fondo-mapa .cat-lineas{filter:none}
+/* Botones Recorrido / Área del mapa (como en el Supervisor de la app) */
+.leaflet-bottom.leaflet-left .vistamapa{margin-bottom:34px}
+.vistamapa{display:flex;background:#fff;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.45);overflow:hidden}
+.vistamapa button{border:0;background:#fff;color:#1f2617;font:600 .78rem var(--display,inherit);padding:7px 10px;min-height:0;border-radius:0;cursor:pointer}
+.vistamapa button+button{border-left:1px solid #d8d4c4}
+.vistamapa button[aria-pressed=true]{background:#0f4d2a;color:#fff}
