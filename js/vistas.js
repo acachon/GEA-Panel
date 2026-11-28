@@ -268,19 +268,21 @@
       const m = x.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*\[([^\]]*)\]\s*(.*)$/);
       return m ? '<li><span class="hq">[' + esc(m[1]) + '] [' + esc(m[2]) + ']</span> ' + esc(m[3]) + '</li>' : '<li>' + esc(x) + '</li>';
     }).join('');
-    const usuario = s.cfg.usuario;
+    const usuario = G.usuario();
     const seguimiento = '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2>'
       + (hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
       + '<div class="segfila"><textarea id="incNota" data-id="' + esc(sel.id) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
       + '<label class="campo segest"><span>Estado</span><select id="incEstado" data-id="' + esc(sel.id) + '"' + dis + '><option' + (borr.est !== 'Resuelta' ? ' selected' : '') + '>Pendiente</option><option' + (borr.est === 'Resuelta' ? ' selected' : '') + '>Resuelta</option></select></label></div>'
-      + '<div class="barra">' + (usuario ? '<span class="sub">Firmará: <b>' + esc(usuario) + '</b></span>' : '<label class="campo"><span>Tu nombre</span><input type="text" id="incUsuario" maxlength="40" autocomplete="name" placeholder="Para firmar el comentario"' + dis + '></label>')
+      + '<div class="barra"><span class="sub">Firmará: <b>' + esc(usuario) + '</b> · <a href="#config">cambiar</a></span>'
       + '<span style="flex:1"></span>' + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(sel.id) + '"' + dis + '>Actualizar</button></div></div>';
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
       + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div><div><span class="sub">Precisión GPS</span><br><b class="num">' + (sel.precision != null ? sel.precision + ' m' : '—') + '</b></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
       + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '') + '</div>'
+      // Adjuntos en carrusel (una fila que se desliza, con ‹ › si no caben), encima del mapa
+      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos' + ((sel.adjuntos || []).length ? ' <span class="chip c-gr num">' + sel.adjuntos.length + '</span>' : '') + '</h2>'
+      + ((sel.adjuntos || []).length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
       + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div>' : '<span class="sub">Sin posición GPS.</span>')
-      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos</h2>' + ((sel.adjuntos || []).length ? '<div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
       + seguimiento + '</div>';
     return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
@@ -323,6 +325,14 @@
   // Visor de adjuntos dentro del panel (vista previa de Drive). Flechas o ‹ › para pasar; Escape o ✕ para cerrar.
   let visor = null;
   function cerrarVisor() { if (visor) { visor.el.remove(); visor = null; document.body.style.overflow = ''; } }
+  // Carrusel de adjuntos: las flechas solo aparecen si hay más adjuntos de los que caben a cada lado
+  G.carrusel = paso => {
+    const c = document.querySelector('.carr'); if (!c) return;
+    const a = c.querySelector('.adjs'), [ant, sig] = c.querySelectorAll('.carrb');
+    if (paso) { a.scrollBy({ left: paso * Math.max(120, a.clientWidth * .8), behavior: 'smooth' }); return; }
+    const flechas = () => { ant.hidden = a.scrollLeft <= 2; sig.hidden = a.scrollLeft + a.clientWidth >= a.scrollWidth - 2; };
+    a.addEventListener('scroll', flechas, { passive: true }); flechas();
+  };
   function pintarVisor() {
     const a = visor.lista[visor.k], id = G.driveId(a.url), u = G.urlSegura(a.url), n = visor.lista.length;
     visor.el.querySelector('.vt').textContent = (TIPO_ADJ[a.tipo] || 'Archivo') + ' · ' + a.nombre + (n > 1 ? '  (' + (visor.k + 1) + ' de ' + n + ')' : '');
@@ -387,7 +397,7 @@
       + '<label>Dirección del servicio<input type="text" id="cUrl" inputmode="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(c.url) + '"></label>'
       + '<label>Clave de lectura<input type="password" id="cClave" autocomplete="new-password" spellcheck="false" placeholder="La CLAVE_LECTURA del servicio" value="' + esc(c.clave) + '"></label>'
       + '<p class="sub" style="margin:0">La dirección y la clave se guardan solo en este navegador. No están en el código del panel.</p>'
-      + '<label>Tu nombre<input type="text" id="cUsuario" maxlength="40" autocomplete="name" placeholder="Firma los comentarios de seguimiento de las incidencias" value="' + esc(c.usuario || '') + '"></label>'
+      + '<label>Usuario <span class="sub" style="font-weight:600">(firma los comentarios de seguimiento de las incidencias)</span><input type="text" id="cUsuario" maxlength="40" autocomplete="name" placeholder="Admin" value="' + esc(G.usuario()) + '"></label>'
       + '<h2 style="margin-top:6px">Reglas de jornada</h2><div class="barra"><label>Horas para contar jornal<input type="number" id="cJornal" min="1" max="12" step="0.5" value="' + esc(c.jornalH) + '"></label><label>Hora de fin (extra desde)<input type="time" id="cFin" value="' + esc(c.finHora) + '"></label></div>'
       + '<label class="chk"><input type="checkbox" id="cPrueba"' + (c.prueba ? ' checked' : '') + '> Incluir filas marcadas como «Datos de prueba»</label>'
       + '<label class="chk"><input type="checkbox" id="cDemo"' + (c.demo ? ' checked' : '') + '> Modo demostración (datos de ejemplo, sin conexión)</label>'

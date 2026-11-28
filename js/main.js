@@ -2,7 +2,7 @@
 (function () {
   const G = GEA, esc = G.esc, $ = s => document.querySelector(s), CLAVE_LS = 'gea.panel.cfg';
   const hoy = () => G.dayKey(new Date());
-  const porDefecto = { url: 'https://script.google.com/macros/s/AKfycbwyxG9hLAvFaBGn_bjbZK-2vN-N8m_93iphLB91ertYT56SY0TQI_wEXtFVBdE4BP8o4Q/exec', clave: '', usuario: '', jornalH: 5, finHora: '17:00', prueba: true, demo: false };
+  const porDefecto = { url: 'https://script.google.com/macros/s/AKfycbwyxG9hLAvFaBGn_bjbZK-2vN-N8m_93iphLB91ertYT56SY0TQI_wEXtFVBdE4BP8o4Q/exec', clave: '', usuario: 'Admin', jornalH: 5, finHora: '17:00', prueba: true, demo: false };
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
@@ -14,6 +14,8 @@
     if (S.modo === 'dias') return S.dias.length ? S.dias.slice() : [h];
     return S.modo === 'hoy' ? [h] : S.modo === 'ayer' ? [G.addDays(h, -1)] : S.modo === '7d' ? ultimos(7) : S.modo === '30d' ? ultimos(30) : [S.dia];
   };
+  // Usuario que firma el seguimiento de las incidencias (Configuración); por defecto, «Admin»
+  G.usuario = () => String(S.cfg.usuario || '').trim() || 'Admin';
   const conectado = () => S.cfg.demo || (S.cfg.url && S.cfg.clave);
 
   async function cargar(forzar, silencioso) {
@@ -109,6 +111,7 @@
     $('#vista').innerHTML = h;
     $('#main').classList.toggle('cargando', S.cargando && !!S.data);
     if (hayMapa && document.getElementById('mapa') && window.L) v.post();
+    G.carrusel();
   }
 
   G.render = render;
@@ -116,21 +119,16 @@
   // Seguimiento de la incidencia elegida («Actualizar»): guarda el estado y añade el comentario, firmado con fecha y usuario
   async function guardarSeguimiento(id) {
     const i = S.data && S.data.inc.find(x => x.id === id); if (!i) return;
-    const txt = ($('#incNota').value || '').replace(/\s+/g, ' ').trim(), est = $('#incEstado').value, caja = $('#incUsuario');
+    const txt = ($('#incNota').value || '').replace(/\s+/g, ' ').trim(), est = $('#incEstado').value, usuario = G.usuario();
     const aviso = t => { S.borrador = { id, t: $('#incNota').value, est }; S.incMsg = { ok: false, t }; render(); };
-    if (caja) {
-      const u = caja.value.replace(/[\[\]\r\n]/g, '').trim();
-      if (!u) return aviso('Escribe tu nombre: con él se firma cada comentario de seguimiento.');
-      S.cfg.usuario = u; guardarCfg(S.cfg);
-    }
     const cambio = est !== i.estado;
     if (!txt && !cambio) return aviso('No hay nada que guardar: escribe un comentario o cambia el estado.');
     const entrada = (cambio ? (est === 'Resuelta' ? 'Marcada como resuelta.' : 'Vuelve a pendiente.') : '') + (txt ? (cambio ? ' ' : '') + txt : '');
     const d = new Date(), fecha = [d.getDate(), d.getMonth() + 1].map(n => String(n).padStart(2, '0')).join('/') + '/' + d.getFullYear();
-    const nota = (i.nota ? i.nota + '\n' : '') + '[' + fecha + '] [' + S.cfg.usuario + '] ' + entrada;
+    const nota = (i.nota ? i.nota + '\n' : '') + '[' + fecha + '] [' + usuario + '] ' + entrada;
     S.borrador = { id, t: txt, est }; S.guardando = true; S.incMsg = null; render();
     try {
-      const r = await G.api.estado(S.cfg, id, est, { entrada, usuario: S.cfg.usuario, nota });
+      const r = await G.api.estado(S.cfg, id, est, { entrada, usuario, nota });
       Object.assign(i, { estado: r.estado, nota: r.nota, fechaEstado: r.fechaEstado });
       S.borrador = null; S.incSel = id;
       S.incMsg = { ok: true, t: 'Seguimiento guardado: «' + (i.comentario || i.tipo) + '» queda ' + (r.estado === 'Resuelta' ? 'resuelta.' : 'pendiente.') };
@@ -145,11 +143,12 @@
     const tc = e.target.closest('#bCal,[data-cald],[data-calm],[data-calx]');
     if (tc) { clicCal(tc, e); return; }
     if (S.cal && !e.target.closest('.cal')) { S.cal = null; pintarCal(); }
-    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],#bSeg,#bAct,#bProbar,#bCsv'); if (!t) return;
+    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],#bSeg,#bAct,#bProbar,#bCsv'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
     else if (t.dataset.inc) { S.incSel = t.dataset.inc; S.incMsg = null; render(); }
     else if (t.id === 'bSeg') { if (!S.guardando) guardarSeguimiento(t.dataset.id); }
     else if (t.dataset.adj) G.abrirVisor(Number(t.dataset.adj));
+    else if (t.dataset.carr) G.carrusel(Number(t.dataset.carr));
     else if (t.id === 'bCsv') G.exportarInc();
     else if (t.dataset.ir) { S.emp = t.dataset.emp || ''; }
     else if (t.dataset.demo) { S.cfg.demo = true; guardarCfg(S.cfg); cargar(true); }
@@ -179,7 +178,7 @@
   });
   document.addEventListener('submit', e => {
     if (e.target.id !== 'formCfg') return; e.preventDefault();
-    S.cfg = { url: $('#cUrl').value.trim(), clave: $('#cClave').value.trim(), usuario: $('#cUsuario').value.replace(/[\[\]\r\n]/g, '').trim(), jornalH: Number($('#cJornal').value) || 5, finHora: $('#cFin').value || '17:00', prueba: $('#cPrueba').checked, demo: $('#cDemo').checked };
+    S.cfg = { url: $('#cUrl').value.trim(), clave: $('#cClave').value.trim(), usuario: $('#cUsuario').value.replace(/[\[\]\r\n]/g, '').trim() || 'Admin', jornalH: Number($('#cJornal').value) || 5, finHora: $('#cFin').value || '17:00', prueba: $('#cPrueba').checked, demo: $('#cDemo').checked };
     guardarCfg(S.cfg); G.api.vaciar(); S.emp = ''; S.lab = '';
     $('#cEstado').textContent = 'Guardado.'; cargar(true).then(() => { if (conectado()) location.hash = '#resumen'; });
   });
