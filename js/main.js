@@ -25,22 +25,28 @@
   }
 
   function cabecera(v) {
-    if (S.vista === 'config') return '<div class="cab"><div><span class="lbl">Finca El Caimbo</span><h1>' + v.t + '</h1></div></div>';
-    const p = G.periodo(), D = S.data, filtroLab = S.vista !== 'incidencias' && S.vista !== 'personal' ? '' : '';
+    if (S.vista === 'config') return '<div class="cab"><div><h1>' + v.t + '</h1></div></div>';
+    const p = G.periodo(), D = S.data, seguidos = esSeguido(p);
     const seg = (m, t) => '<button data-modo="' + m + '" class="' + (S.modo === m ? 'on' : '') + '">' + t + '</button>';
-    const seguidos = p.every((d, i) => !i || G.addDays(p[i - 1], 1) === d);
-    const fecha = p.length === 1 ? G.diaLargo(p[0]) : seguidos ? G.diaCorto(p[0]) + ' – ' + G.diaCorto(p[p.length - 1]) : p.length + ' días elegidos';
     const ddmm = k => k.split('-').reverse().slice(0, 2).join('/');
     const txtDias = p.length === 1 ? p[0].split('-').reverse().join('/') : seguidos ? ddmm(p[0]) + ' – ' + ddmm(p[p.length - 1]) : p.length + ' días';
     const opts = (lista, sel, vacio) => '<option value="">' + vacio + '</option>' + lista.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === sel ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
-    return '<div class="cab"><div><span class="lbl">Finca El Caimbo · ' + fecha + '</span><h1>' + v.t + '</h1><div class="barra" style="margin-top:6px">'
-      + (S.actualizado ? '<span class="sub">Actualizado ' + G.hhmm(S.actualizado) + '</span>' : '')
-      + (S.cfg.demo ? '<span class="chip c-av">Datos de ejemplo</span>' : D && D.hayPrueba ? '<span class="chip c-av">Incluye datos de prueba</span>' : '')
-      + '</div></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
+    const aviso = S.cfg.demo ? '<span class="chip c-av">Datos de ejemplo</span>' : D && D.hayPrueba ? '<span class="chip c-av">Incluye datos de prueba</span>' : '';
+    return '<div class="cab"><div class="barra"><h1>' + v.t + '</h1>' + aviso + '</div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
       + '<div class="calw"><button type="button" class="campo" id="bCal" aria-haspopup="dialog" aria-expanded="' + !!S.cal + '" title="Elegir uno o varios días"><span>Días</span><b>' + txtDias + '</b>' + ICO_CAL + '</button>' + (S.cal ? htmlCal() : '') + '</div>'
       + (D ? (S.vista === 'incidencias' ? '' : '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>')
         + (S.vista === 'resumen' || S.vista === 'mapa' || S.vista === 'labores' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
-      + '<button class="btn pri" id="bAct"' + (S.cargando ? ' disabled' : '') + '>' + (S.cargando ? 'Cargando…' : 'Actualizar') + '</button></div></div>' + filtroLab;
+      + '<button type="button" class="ico act' + (S.cargando ? ' gira' : '') + '" id="bAct"' + (S.cargando ? ' disabled' : '') + ' title="' + (S.cargando ? 'Cargando datos…' : 'Actualizar datos') + '" aria-label="' + (S.cargando ? 'Cargando datos' : 'Actualizar datos') + '">' + ICO_ACT + '</button></div></div>';
+  }
+  const ICO_ACT = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
+  const esSeguido = p => p.every((d, i) => !i || G.addDays(p[i - 1], 1) === d);
+
+  // Menú de la izquierda: días que se están viendo y hora de la última actualización
+  function pintarEstado() {
+    const p = G.periodo(), el = $('#navEstado'); if (!el) return;
+    const fecha = p.length === 1 ? G.diaLargo(p[0]) : esSeguido(p) ? G.diaCorto(p[0]) + ' – ' + G.diaCorto(p[p.length - 1]) : p.length + ' días elegidos';
+    el.innerHTML = '<span class="ed"><span class="lbl">Datos de</span> <b>' + fecha + '</b></span>'
+      + '<span class="eh">' + (S.cargando ? 'Cargando…' : S.actualizado ? 'Actualizado a las ' + G.hhmm(S.actualizado) : conectado() ? '' : 'Sin conexión') + '</span>';
   }
 
   /* Calendario de la cabecera: se pueden marcar varios días (con Mayús, todos los de un tramo) y «Aplicar» los carga */
@@ -89,7 +95,11 @@
   function render() {
     G.destruirMapa();
     const v = G.vistas[S.vista] || G.vistas.resumen;
-    document.querySelectorAll('#nav a.item').forEach(a => a.classList.toggle('on', a.dataset.v === S.vista));
+    document.querySelectorAll('#nav a.item').forEach(a => { const on = a.dataset.v === S.vista; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    pintarEstado();
+    // En el móvil el menú es un carrusel: se desliza hasta la sección abierta
+    const menu = $('#nav .menu'), on = $('#nav a.item.on');
+    if (menu && on && menu.scrollWidth > menu.clientWidth) menu.scrollTo({ left: Math.max(0, on.offsetLeft - menu.offsetLeft - 24), behavior: 'smooth' });
     let h = cabecera(v), hayMapa = false;
     if (v.sinDatos) h += v.f();
     else if (!conectado()) h += '<div class="card" style="max-width:640px"><h2>Conecta el panel con el Registro central</h2><p class="sub">Escribe la dirección del servicio y la clave de lectura (las mismas que usa el supervisor en la app) o mira cómo quedaría con datos de ejemplo.</p><div class="barra"><a class="btn pri" style="display:inline-flex;align-items:center;text-decoration:none" href="#config">Configurar conexión</a><button class="btn" data-demo="1">Ver con datos de ejemplo</button></div></div>';
