@@ -178,3 +178,21 @@ button.campo svg{color:var(--olivo)}
 .calb.pri{color:var(--olivo)}
 .calb.pri:hover{background:#e1f0d4}
 .calb:disabled{opacity:.4;cursor:default;background:transparent}
+/* Listado de incidencias: el tipo tiene ancho fijo y se recorta con «…» */
+.lista .chip.tipo{flex:0 0 112px;width:112px;display:block;overflow:hidden;text-overflow:ellipsis;text-align:center}
+/* Seguimiento: historial, comentario nuevo con el estado a la derecha y botón Actualizar */
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.hist li{padding:8px 10px;border-radius:8px;background:#f4f3ec;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.hist .hq{font-weight:700;color:var(--olivo);font-variant-numeric:tabular-nums}
+.segfila{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.segfila textarea{flex:1 1 220px;width:auto;min-height:64px}
+.segfila .segest{flex:0 0 auto;align-self:flex-start}
+.visor .vdrive[hidden]{display:none}
+.vdemo{display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;text-align:center}
+.vdemo svg{width:72px;height:72px}
+/* Número de la incidencia (el mismo que en su triángulo del mapa) */
+.lista .nro{flex:none;min-width:26px;height:26px;padding:0 5px;border-radius:13px;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff,0 1px 3px rgba(0,0,0,.25)}
+/* Mapa del detalle: más grande y casi cuadrado; triángulos por tipo */
+.mapa.mini{height:auto;aspect-ratio:1/.88;min-height:300px;max-height:520px}
+.mk.tri svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));overflow:visible}
+.mk.tri.sel svg{filter:drop-shadow(0 0 4px rgba(0,0,0,.6))}

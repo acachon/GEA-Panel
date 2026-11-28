@@ -40,11 +40,13 @@
     return r;
   }
 
-  // Marca una incidencia como «Pendiente» o «Resuelta» (con una nota) en la Hoja. En modo demostración solo cambia en memoria.
-  async function estado(cfg, id, valor, nota) {
-    let r = { ok: true, id, estado: valor, nota, fechaEstado: new Date().toISOString() };
+  // Seguimiento de una incidencia: estado («Pendiente» o «Resuelta») y un comentario nuevo (entrada) firmado por el usuario.
+  // El servicio añade «[DD/MM/AAAA] [Usuario] comentario» al historial. `nota` es el historial ya compuesto aquí: lo usa el modo
+  // demostración y, si el servicio aún es la versión anterior (sin `entrada`), es lo que se guarda.
+  async function estado(cfg, id, valor, seg) {
+    let r = { ok: true, id, estado: valor, nota: seg.nota, fechaEstado: new Date().toISOString() };
     if (!cfg.demo) {
-      const res = await fetch(cfg.url, { method: 'POST', body: JSON.stringify({ tipo: 'estado', clave: cfg.clave, id, estado: valor, nota }) });
+      const res = await fetch(cfg.url, { method: 'POST', body: JSON.stringify({ tipo: 'estado', clave: cfg.clave, id, estado: valor, entrada: seg.entrada, usuario: seg.usuario, nota: seg.nota }) });
       if (!res.ok) throw new Error('El servicio respondió ' + res.status);
       try { r = await res.json(); } catch (e) { throw new Error('La respuesta del servicio no es válida'); }
       // El servicio antiguo no conoce «estado» y lo trata como un envío con la clave de escritura

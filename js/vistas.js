@@ -217,8 +217,9 @@
   };
   const chipEst = e => e === 'Resuelta' ? '<span class="chip c-ok">Resuelta</span>' : '<span class="chip c-av">Pendiente</span>';
   const normal = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  // Adjuntos que se pueden abrir (con enlace de Google Drive)
-  const adjVisibles = i => (i.adjuntos || []).filter(a => G.urlSegura(a.url));
+  // Adjuntos que se pueden abrir: con enlace de Google Drive (o, en el modo demostración, de ejemplo)
+  const esDemo = a => /^demo:/.test(a.url || '');
+  const adjVisibles = i => (i.adjuntos || []).filter(a => G.urlSegura(a.url) || esDemo(a));
   // Incidencias que pasan los filtros de la pantalla (tipo, estado y texto buscado), en el orden elegido
   const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado' };
   G.incFiltradas = () => {
@@ -248,7 +249,9 @@
       + '<button type="button" class="ico" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Exportar a Excel" aria-label="Exportar a Excel">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
     if (!l.length) return barra + msg + '<div class="fila">' + ficha(vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.')) + '</div>';
 
-    const item = i => '<div class="it clic' + (i.id === sel.id ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><span class="chip c-gr">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
+    // El tipo ocupa siempre el mismo ancho: si el nombre es largo se recorta con «…» (completo al pasar el ratón)
+    // El número (con el color del tipo) es el mismo que lleva su triángulo en el mapa
+    const item = (i, k) => '<div class="it clic' + (i.id === sel.id ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Número ' + (k + 1) + ' en el mapa">' + (k + 1) + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
       + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
     // Adjuntos: miniatura de las fotos (si Drive la da) e icono para vídeos y audios; al pulsar se abren en el visor
     const va = adjVisibles(sel);
@@ -258,22 +261,38 @@
       return k < 0 ? '<span class="adj sin" title="Este adjunto aún no tiene enlace en Drive">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + '<span>' + t + ' (sin enlace)</span></span>'
         : '<button type="button" class="adj" data-adj="' + k + '" title="Ver ' + esc(a.nombre) + '">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + img + '<span>' + t + '</span></button>';
     };
-    const borr = s.borrador && s.borrador.id === sel.id ? s.borrador.t : sel.nota;
+    // Seguimiento: historial «[DD/MM/AAAA] [Usuario] comentario» (una línea por comentario guardado), comentario nuevo y estado
+    const borr = s.borrador && s.borrador.id === sel.id ? s.borrador : { t: '', est: sel.estado };
     const res = sel.estado === 'Resuelta', dis = s.guardando ? ' disabled' : '';
+    const hist = String(sel.nota || '').split('\n').filter(x => x.trim()).map(x => {
+      const m = x.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*\[([^\]]*)\]\s*(.*)$/);
+      return m ? '<li><span class="hq">[' + esc(m[1]) + '] [' + esc(m[2]) + ']</span> ' + esc(m[3]) + '</li>' : '<li>' + esc(x) + '</li>';
+    }).join('');
+    const usuario = s.cfg.usuario;
+    const seguimiento = '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2>'
+      + (hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
+      + '<div class="segfila"><textarea id="incNota" data-id="' + esc(sel.id) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
+      + '<label class="campo segest"><span>Estado</span><select id="incEstado" data-id="' + esc(sel.id) + '"' + dis + '><option' + (borr.est !== 'Resuelta' ? ' selected' : '') + '>Pendiente</option><option' + (borr.est === 'Resuelta' ? ' selected' : '') + '>Resuelta</option></select></label></div>'
+      + '<div class="barra">' + (usuario ? '<span class="sub">Firmará: <b>' + esc(usuario) + '</b></span>' : '<label class="campo"><span>Tu nombre</span><input type="text" id="incUsuario" maxlength="40" autocomplete="name" placeholder="Para firmar el comentario"' + dis + '></label>')
+      + '<span style="flex:1"></span>' + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(sel.id) + '"' + dis + '>Actualizar</button></div></div>';
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
       + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div><div><span class="sub">Precisión GPS</span><br><b class="num">' + (sel.precision != null ? sel.precision + ' m' : '—') + '</b></div>'
       + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '') + '</div>'
-      + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div><div><a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noopener" href="https://maps.google.com/?q=' + sel.lat + ',' + sel.lon + '">Abrir en Google Maps (' + sel.lat.toFixed(5) + ', ' + sel.lon.toFixed(5) + ')</a></div>' : '<span class="sub">Sin posición GPS.</span>')
+      + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div>' : '<span class="sub">Sin posición GPS.</span>')
       + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos</h2>' + ((sel.adjuntos || []).length ? '<div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
-      + '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2><textarea id="incNota" data-id="' + esc(sel.id) + '" rows="3" maxlength="1000" placeholder="Nota: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr) + '</textarea>'
-      + '<div class="barra">' + (res ? '<button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Volver a pendiente</button><button class="btn" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>'
-        : '<button class="btn pri" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Marcar como resuelta</button><button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>')
-      + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '</div></div></div>';
+      + seguimiento + '</div>';
     return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
 
   // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
+  // Triángulo de la incidencia: color de su tipo y su número del listado (la elegida, más grande y con borde lima)
+  const triangulo = (i, n, elegida) => {
+    const w = elegida ? 40 : 30, h = Math.round(w * .92), c = G.colorTipo(i.tipo), fs = String(n).length > 2 ? 8 : String(n).length > 1 ? 10 : 12;
+    return L.divIcon({ className: 'mk tri' + (elegida ? ' sel' : ''), iconSize: [w, h], iconAnchor: [w / 2, h - 2],
+      html: '<svg width="' + w + '" height="' + h + '" viewBox="0 0 30 28" aria-hidden="true"><path d="M15 2 L28.5 25.5 H1.5 Z" fill="' + c + '" stroke="' + (elegida ? '#a6cd3a' : '#fff') + '" stroke-width="' + (elegida ? 3 : 2) + '" stroke-linejoin="round"/><text x="15" y="22" text-anchor="middle" font-size="' + fs + '" font-weight="800" fill="#fff" font-family="Figtree,system-ui,sans-serif">' + n + '</text></svg>' });
+  };
+  const ICO_GMAPS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
   function miniMapa() {
     const el = document.getElementById('mapa'), sel = G.incSeleccionada();
     if (!el || !sel || sel.lat == null) return;
@@ -283,12 +302,20 @@
     let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
     (fondos[fondo] || fondos['Aérea']).addTo(m);
     L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
-    G.incFiltradas().filter(i => i.lat != null && i.id !== sel.id).forEach(i => {
-      L.marker([i.lat, i.lon], { icon: L.divIcon({ className: 'mk', html: '<div class="i peq"></div>', iconSize: [18, 16], iconAnchor: [9, 15] }) })
-        .bindTooltip(esc(i.tipo) + ' · ' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia)).on('click', () => { S().incSel = i.id; S().incMsg = null; G.render(); }).addTo(m);
+    // Abrir en Google Maps: icono dentro del mapa, bajo el zoom
+    const GM = L.Control.extend({ options: { position: 'topleft' }, onAdd() {
+      const c = L.DomUtil.create('div', 'leaflet-bar ubic'), a = L.DomUtil.create('a', '', c);
+      a.href = 'https://maps.google.com/?q=' + sel.lat + ',' + sel.lon; a.target = '_blank'; a.rel = 'noopener'; a.title = 'Abrir en Google Maps'; a.setAttribute('aria-label', a.title); a.innerHTML = ICO_GMAPS;
+      L.DomEvent.disableClickPropagation(c); return c; } });
+    new GM().addTo(m);
+    // Cada incidencia con su número del listado (mismo orden y filtros)
+    G.incFiltradas().forEach((i, k) => {
+      if (i.lat == null || i.id === sel.id) return;
+      L.marker([i.lat, i.lon], { icon: triangulo(i, k + 1, false) })
+        .bindTooltip((k + 1) + '. ' + esc(i.tipo) + ' · ' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia)).on('click', () => { S().incSel = i.id; S().incMsg = null; G.render(); }).addTo(m);
     });
-    if (sel.precision && sel.precision <= 200) L.circle([sel.lat, sel.lon], { radius: sel.precision, color: '#f2b600', weight: 1, fillOpacity: .15, interactive: false }).addTo(m);
-    L.marker([sel.lat, sel.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: 'mk', html: '<div class="i"></div>', iconSize: [26, 24], iconAnchor: [13, 22] }) }).bindTooltip(esc(sel.tipo)).addTo(m);
+    if (sel.precision && sel.precision <= 200) L.circle([sel.lat, sel.lon], { radius: sel.precision, color: G.colorTipo(sel.tipo), weight: 1, fillOpacity: .15, interactive: false }).addTo(m);
+    L.marker([sel.lat, sel.lon], { zIndexOffset: 1000, icon: triangulo(sel, G.incFiltradas().indexOf(sel) + 1, true) }).bindTooltip(esc(sel.tipo)).addTo(m);
     m.setView([sel.lat, sel.lon], 17);
     setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 80);
   }
@@ -299,9 +326,9 @@
   function pintarVisor() {
     const a = visor.lista[visor.k], id = G.driveId(a.url), u = G.urlSegura(a.url), n = visor.lista.length;
     visor.el.querySelector('.vt').textContent = (TIPO_ADJ[a.tipo] || 'Archivo') + ' · ' + a.nombre + (n > 1 ? '  (' + (visor.k + 1) + ' de ' + n + ')' : '');
-    visor.el.querySelector('.vdrive').href = u;
+    visor.el.querySelector('.vdrive').href = u || '#'; visor.el.querySelector('.vdrive').hidden = !u;
     visor.el.querySelectorAll('.vnav').forEach(b => { b.hidden = n < 2; });
-    visor.el.querySelector('.vmarco').innerHTML = id ? '<iframe title="' + esc(a.nombre) + '" src="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/preview" allow="autoplay; fullscreen" allowfullscreen></iframe>'
+    visor.el.querySelector('.vmarco').innerHTML = esDemo(a) ? '<div class="vdemo">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + '<b>' + esc(TIPO_ADJ[a.tipo] || 'Archivo') + ' de ejemplo</b><span>' + esc(a.nombre) + '</span><span class="sub" style="color:#cfe0cf">En el modo demostración no hay archivos reales.</span></div>' : id ? '<iframe title="' + esc(a.nombre) + '" src="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/preview" allow="autoplay; fullscreen" allowfullscreen></iframe>'
       : '<div class="vacio" style="color:#fff">No se puede mostrar aquí. Usa «Abrir en Drive».</div>';
   }
   G.abrirVisor = k => {
@@ -360,6 +387,7 @@
       + '<label>Dirección del servicio<input type="text" id="cUrl" inputmode="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(c.url) + '"></label>'
       + '<label>Clave de lectura<input type="password" id="cClave" autocomplete="new-password" spellcheck="false" placeholder="La CLAVE_LECTURA del servicio" value="' + esc(c.clave) + '"></label>'
       + '<p class="sub" style="margin:0">La dirección y la clave se guardan solo en este navegador. No están en el código del panel.</p>'
+      + '<label>Tu nombre<input type="text" id="cUsuario" maxlength="40" autocomplete="name" placeholder="Firma los comentarios de seguimiento de las incidencias" value="' + esc(c.usuario || '') + '"></label>'
       + '<h2 style="margin-top:6px">Reglas de jornada</h2><div class="barra"><label>Horas para contar jornal<input type="number" id="cJornal" min="1" max="12" step="0.5" value="' + esc(c.jornalH) + '"></label><label>Hora de fin (extra desde)<input type="time" id="cFin" value="' + esc(c.finHora) + '"></label></div>'
       + '<label class="chk"><input type="checkbox" id="cPrueba"' + (c.prueba ? ' checked' : '') + '> Incluir filas marcadas como «Datos de prueba»</label>'
       + '<label class="chk"><input type="checkbox" id="cDemo"' + (c.demo ? ' checked' : '') + '> Modo demostración (datos de ejemplo, sin conexión)</label>'

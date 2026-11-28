@@ -43,6 +43,17 @@
           out.incidencias.push({ id: `demo-i-${dia}-${ie}`, nombre, tipo, comentario: com, iso: new Date(t).toISOString(), lat: +(pos[0]).toFixed(6), lon: +(pos[1]).toFixed(6), precision: 8, prueba: false, estado: rnd() < .4 ? 'Resuelta' : 'Pendiente', nota: '', adjuntos: rnd() < .5 ? [{ tipo: 'foto', nombre: 'demo_foto1.jpg', url: '' }] : [] });
         }
       });
+      // Hoy, tres incidencias con varios adjuntos de cada clase (para ver el visor con muchos archivos) y una con historial de seguimiento
+      if (dia === G.dayKey(new Date())) {
+        const adj = (pref, lista) => lista.map((t, k) => { const n = lista.slice(0, k).filter(x => x === t).length; return { tipo: t, nombre: pref + '_' + t + (n ? n + 1 : '') + '.' + { foto: 'jpg', video: 'webm', audio: 'wav' }[t], url: 'demo:' + t }; });
+        [['Sebastián', 'Riego', 'Varias fugas en el cabezal de riego: dejo fotos, vídeos y notas de voz.', 9.5, ['foto', 'foto', 'video', 'video', 'audio', 'audio'], ''],
+         ['Andrés', 'Olivo', 'Rama grande partida en la parcela sur, cerca del camino de servicio.', 10.25, ['foto', 'video', 'audio', 'foto', 'video', 'audio', 'foto'], '[' + dia.split('-').reverse().join('/') + '] [Ángel] Avisado Juan para que la retire con la motosierra.'],
+         ['Pepe', 'Vehículo/Herramienta', 'El tractor pierde aceite por el lado izquierdo; grabo cómo suena el motor.', 11, ['audio', 'audio', 'audio', 'video', 'video', 'foto', 'foto'], '']]
+          .forEach(([nombre, tipo, com, h, lista, nota], k) => {
+            const t = Math.min(G.parseDay(dia).getTime() + h * 3600000, ahora - (3 - k) * 60000);
+            out.incidencias.push({ id: `demo-v-${dia}-${k}`, nombre, tipo, comentario: com, iso: new Date(t).toISOString(), lat: BASE[0] + 0.0004 * (k - 1), lon: BASE[1] + 0.0005 * (1 - k), precision: 6, prueba: false, estado: 'Pendiente', nota, adjuntos: adj(`${dia}_${nombre}_${tipo.replace(/\W+/g, '-')}`, lista) });
+          });
+      }
     });
     return out;
   }
