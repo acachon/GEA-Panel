@@ -178,7 +178,6 @@ button.campo svg{color:var(--olivo)}
 .calb.pri:hover{background:#e1f0d4}
 .calb:disabled{opacity:.4;cursor:default;background:transparent}
 /* Listado de incidencias: el tipo tiene ancho fijo y se recorta con «…» */
-.lista .chip.tipo{flex:0 0 112px;width:112px;display:block;overflow:hidden;text-overflow:ellipsis;text-align:center}
 /* Seguimiento: historial, comentario nuevo con el estado a la derecha y botón Actualizar */
 .hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
 .hist li{padding:8px 10px;border-radius:8px;background:#f4f3ec;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
@@ -232,7 +231,7 @@ button.campo svg{color:var(--olivo)}
    debajo, el comentario y quién/cuándo a todo lo ancho */
 @media (max-width:600px){
   .lista .it{flex-wrap:wrap;gap:6px}
-  .lista .it .chip.tipo{margin-right:auto;flex:1 1 0;width:auto;min-width:44px;max-width:130px}
+  .lista .it .tipoico{margin-right:auto}
   .lista .it > .chip,.lista .it > .segico{flex-shrink:0}
   .lista .it .itx{order:10;flex:1 1 100% !important;padding-left:26px}
 }
@@ -247,3 +246,8 @@ button.campo svg{color:var(--olivo)}
 .pleg > summary:focus-visible{outline:2px solid var(--lima);outline-offset:2px;border-radius:6px}
 .pleg > .plegc{margin-top:10px}
 .pleg .gestion{border-top:0;padding-top:0}
+/* Tipo de incidencia en el listado: icono de la app y su nombre corto debajo, en un hueco de ancho fijo */
+.lista .tipoico{flex:0 0 62px;width:62px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+.lista .tipoico img{width:36px;height:36px;display:block}
+.lista .tipoico b{max-width:100%;font-size:11px;line-height:1.15;font-weight:700;color:#1d4d2c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lista .it.res .tipoico{opacity:.75}
