@@ -40,7 +40,7 @@
         });
         if (rnd() < .35 && ini < ahora) {
           const [tipo, com] = INC[Math.floor(rnd() * INC.length)], t = Math.min(ini + (120 + Math.round(rnd() * 240)) * 60000, lim);
-          out.incidencias.push({ id: `demo-i-${dia}-${ie}`, nombre, tipo, comentario: com, iso: new Date(t).toISOString(), lat: +(pos[0]).toFixed(6), lon: +(pos[1]).toFixed(6), precision: 8, prueba: false, adjuntos: rnd() < .5 ? [{ tipo: 'foto', nombre: 'demo_foto1.jpg', url: '' }] : [] });
+          out.incidencias.push({ id: `demo-i-${dia}-${ie}`, nombre, tipo, comentario: com, iso: new Date(t).toISOString(), lat: +(pos[0]).toFixed(6), lon: +(pos[1]).toFixed(6), precision: 8, prueba: false, estado: rnd() < .4 ? 'Resuelta' : 'Pendiente', nota: '', adjuntos: rnd() < .5 ? [{ tipo: 'foto', nombre: 'demo_foto1.jpg', url: '' }] : [] });
         }
       });
     });

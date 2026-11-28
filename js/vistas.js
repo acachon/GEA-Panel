@@ -23,15 +23,19 @@
   }
   const ICO_YO ='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>';
   const ICO_TODO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+  // Fondos del mapa
+  const crearFondos = () => ({
+    // Aérea: ortofoto del PNOA (IGN España), sin nubes y con detalle de 25 cm; es el fondo por defecto (la misma que usa la app)
+    'Aérea': L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', { layers: 'OI.OrthoimageCoverage', format: 'image/jpeg', version: '1.3.0', maxZoom: 21, maxNativeZoom: 20,
+      attribution: 'PNOA © <a href="https://www.scne.es/" target="_blank" rel="noopener">IGN</a> (CC BY 4.0)' }),
+    // Satélite: Esri World Imagery (en zonas rurales solo hay imagen hasta el zoom 18)
+    'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' }),
+    'Mapa': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' })
+  });
   function pintarMapa(el, D, f, capas) {
     G.destruirMapa();
     const m = L.map(el); mapaActual = m;
-    // Aérea: ortofoto del PNOA (IGN España), sin nubes y con detalle de 25 cm; es el fondo por defecto (la misma que usa la app)
-    const aerea = L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', { layers: 'OI.OrthoimageCoverage', format: 'image/jpeg', version: '1.3.0', maxZoom: 21, maxNativeZoom: 20,
-      attribution: 'PNOA © <a href="https://www.scne.es/" target="_blank" rel="noopener">IGN</a> (CC BY 4.0)' });
-    // Satélite: Esri World Imagery (en zonas rurales solo hay imagen hasta el zoom 18)
-    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
-    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    const { 'Aérea': aerea, 'Satélite': sat, 'Mapa': osm } = crearFondos();
     const control = (pos, clase, crear) => {
       const C = L.Control.extend({ options: { position: pos }, onAdd() { const c = L.DomUtil.create('div', clase); crear(c); L.DomEvent.disableClickPropagation(c); return c; } });
       new C().addTo(m);
@@ -151,14 +155,14 @@
       + kpi('Horas trabajadas', G.fmtMin(trab), J.length ? 'Media ' + G.fmtMin(trab / J.length) + ' por jornada' : 'Sin jornadas')
       + kpi('Distancia recorrida', G.fmtNum(km, 1) + ' km', 'Suma de los recorridos GPS')
       + kpi('Superficie cubierta', G.fmtNum(ha, 1) + ' ha', 'Según las labores registradas')
-      + kpi('Incidencias', incs.length, incs.length ? incs.slice(0, 2).map(i => esc(i.tipo)).join(' · ') : 'Ninguna en el periodo')
+      + kpi('Incidencias', incs.length, incs.length ? incs.filter(i => i.estado !== 'Resuelta').length + ' pendientes · ' + incs.filter(i => i.estado === 'Resuelta').length + ' resueltas' : 'Ninguna en el periodo')
       + kpi('Jornales', jornales, 'Con ' + (s.cfg.jornalH) + ' h o más · ' + G.fmtMin(extra) + ' extra')
       + '</div>'
       + '<div class="fila"><div class="card" style="flex:2 1 560px;min-width:0;display:flex;flex-direction:column;gap:10px"><div><h2>Posición y recorridos</h2><span class="sub">Último punto GPS de cada empleado y recorridos del periodo</span></div><div id="mapa" class="mapa"></div></div>'
       + '<div style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:16px"><div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Personal · ' + G.diaCorto(dia) + '</h2><a href="#personal">Ver jornales →</a></div><div class="lista">'
       + (est.length ? est.map(e => '<div class="it"><span class="av" style="background:' + G.colorEmp(D.empleados, e.emp) + '">' + esc(G.inicial(e.emp)) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(e.emp) + '</div><div class="sub">' + esc(e.act.actividad) + ' · desde ' + G.hhmm(e.desde) + (e.ult ? ' · último punto ' + G.hhmm(e.ult.t) : ' · sin puntos GPS') + '</div></div>' + chipEstado(e) + '</div>').join('') : vacio('Nadie ha registrado actividad este día.'))
       + '</div></div><div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Incidencias recientes</h2><a href="#incidencias">Ver todas →</a></div><div class="lista">'
-      + (incs.length ? incs.slice(0, 4).map(i => '<div class="it"><span class="chip c-av">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div></div>').join('') : vacio('Sin incidencias.'))
+      + (incs.length ? incs.slice(0, 4).map(i => '<div class="it"><span class="chip c-gr">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>' + chipEst(i.estado) + '</div>').join('') : vacio('Sin incidencias.'))
       + '</div></div></div></div>'
       + '<div class="fila"><div class="card" style="flex:2 1 560px;min-width:0"><h2>Jornada por empleado · ' + G.diaCorto(dia) + '</h2><span class="sub">Cada bloque es una actividad registrada; el rayado es el almuerzo</span><div style="margin-top:10px">' + gantt(D, dia, f) + '</div></div>'
       + '<div class="card" style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:10px"><h2>Horas por labor</h2>' + (labs.length ? barras(labs.map(l => [l.L.n, l.min, l.L.c, G.fmtMin(l.min)]), maxL) : vacio('Sin labores en el periodo.')) + '</div>'
@@ -205,18 +209,132 @@
   const notaEstimacion = D => D.acts.some(a => !a.exacta) ? '<div class="sub" style="margin-top:6px">Las duraciones se estiman con el último punto GPS de cada actividad. Para que sean exactas, activa «Min activa» en el servicio (ver servicio/LEEME.md).</div>' : '';
 
   /* ---------- Incidencias ---------- */
+  const TIPO_ADJ = { foto: 'Foto', video: 'Vídeo', audio: 'Audio' };
+  const ICO_ADJ = {
+    video: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-4v12l-6-4"/></svg>',
+    audio: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>',
+    foto: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>'
+  };
+  const chipEst = e => e === 'Resuelta' ? '<span class="chip c-ok">Resuelta</span>' : '<span class="chip c-av">Pendiente</span>';
+  const normal = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // Adjuntos que se pueden abrir (con enlace de Google Drive)
+  const adjVisibles = i => (i.adjuntos || []).filter(a => G.urlSegura(a.url));
+  // Incidencias que pasan los filtros de la pantalla: empleado, tipo, estado y texto buscado
+  G.incFiltradas = () => {
+    const s = S(), q = normal(s.q).trim();
+    return s.data.inc.filter(i => (!s.emp || i.nombre === s.emp) && (!s.tipo || i.tipo === s.tipo) && (!s.est || i.estado === s.est)
+      && (!q || normal([i.comentario, i.tipo, i.nombre, i.nota].join(' ')).includes(q)));
+  };
+  G.incSeleccionada = () => { const l = G.incFiltradas(); return l.find(i => i.id === S().incSel) || l[0]; };
+
   function incidencias() {
-    const s = S(), D = s.data, tipos = Array.from(new Set(D.inc.map(i => i.tipo))).sort();
-    let l = D.inc.filter(i => (!s.emp || i.nombre === s.emp) && (!s.tipo || i.tipo === s.tipo));
-    const sel = l.find(i => i.id === s.incSel) || l[0];
-    const adj = i => (i.adjuntos || []).map(a => { const u = G.urlSegura(a.url), t = { foto: 'Foto', video: 'Vídeo', audio: 'Audio' }[a.tipo] || 'Archivo'; return u ? '<a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" href="' + esc(u) + '" target="_blank" rel="noopener">' + t + ' · ' + esc(a.nombre) + '</a>' : '<span class="chip c-gr">' + t + ' (sin enlace)</span>'; }).join(' ');
-    return '<div class="barra"><label class="campo"><span>Tipo</span><select id="fTipo"><option value="">Todos</option>' + tipos.map(t => '<option' + (t === s.tipo ? ' selected' : '') + ' value="' + esc(t) + '">' + esc(t) + '</option>').join('') + '</select></label><span class="chip c-gr">' + l.length + ' incidencias</span></div>'
-      + (!l.length ? vacio('No hay incidencias en el periodo.') : '<div class="fila"><div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lista">' + l.map(i => '<div class="it clic' + (sel && i.id === sel.id ? ' sel' : '') + '" data-inc="' + esc(i.id) + '"><span class="chip c-av">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>' + ((i.adjuntos || []).length ? '<span class="chip c-gr">' + i.adjuntos.length + ' adj.</span>' : '') + '</div>').join('') + '</div></div>'
-        + '<div class="card" style="flex:1 1 380px;min-width:0;display:flex;flex-direction:column;gap:12px"><div><span class="lbl">' + esc(sel.tipo) + '</span><h2 style="font-size:20px;margin-top:4px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div><div><span class="sub">Precisión GPS</span><br><b class="num">' + (sel.precision != null ? sel.precision + ' m' : '—') + '</b></div></div>'
-        + (sel.lat != null ? '<div><a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noopener" href="https://maps.google.com/?q=' + sel.lat + ',' + sel.lon + '">Abrir ubicación (' + sel.lat.toFixed(5) + ', ' + sel.lon.toFixed(5) + ')</a></div>' : '<span class="sub">Sin posición GPS.</span>')
-        + '<div style="display:flex;flex-wrap:wrap;gap:8px">' + (adj(sel) || '<span class="sub">Sin adjuntos.</span>') + '</div></div></div>');
+    const s = S(), D = s.data, p = G.periodo(), hoy = G.dayKey(new Date());
+    const tipos = Array.from(new Set(D.inc.map(i => i.tipo))).sort((a, b) => a.localeCompare(b, 'es'));
+    const l = G.incFiltradas(), sel = G.incSeleccionada();
+    const pend = D.inc.filter(i => (!s.emp || i.nombre === s.emp) && i.estado !== 'Resuelta').length;
+    const op = (v, t, a) => '<option value="' + esc(v) + '"' + (v === a ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const msg = s.incMsg ? '<div class="aviso ' + (s.incMsg.ok ? 'ok' : 'err') + '" role="status">' + esc(s.incMsg.t) + '</div>' : '';
+    const barra = '<div class="barra">'
+      + '<label class="campo"><span>Desde</span><input type="date" id="fDesde" max="' + hoy + '" value="' + p[0] + '"></label>'
+      + '<label class="campo"><span>Hasta</span><input type="date" id="fHasta" max="' + hoy + '" value="' + p[p.length - 1] + '"></label>'
+      + '<label class="campo"><span>Estado</span><select id="fEst">' + op('', 'Todas', s.est) + op('Pendiente', 'Pendientes', s.est) + op('Resuelta', 'Resueltas', s.est) + '</select></label>'
+      + '<label class="campo"><span>Tipo</span><select id="fTipo">' + op('', 'Todos', s.tipo) + tipos.map(t => op(t, t, s.tipo)).join('') + '</select></label>'
+      + '<label class="campo buscar"><span>Buscar</span><input type="search" id="fBuscar" placeholder="Comentario, empleado, nota…" value="' + esc(s.q) + '"></label>'
+      + '<span class="chip c-gr">' + l.length + (l.length === 1 ? ' incidencia' : ' incidencias') + '</span>' + (pend ? '<span class="chip c-av">' + pend + (pend === 1 ? ' pendiente' : ' pendientes') + '</span>' : '')
+      + '<span style="flex:1"></span><button class="btn" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Descarga las incidencias filtradas en un archivo que abre Excel">Exportar a Excel (CSV)</button></div>';
+    if (!l.length) return barra + msg + vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.');
+
+    const item = i => '<div class="it clic' + (i.id === sel.id ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><span class="chip c-gr">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
+      + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
+    // Adjuntos: miniatura de las fotos (si Drive la da) e icono para vídeos y audios; al pulsar se abren en el visor
+    const va = adjVisibles(sel);
+    const tesela = a => {
+      const k = va.indexOf(a), t = TIPO_ADJ[a.tipo] || 'Archivo', id = G.driveId(a.url);
+      const img = a.tipo === 'foto' && id ? '<img alt="" loading="lazy" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&amp;sz=w400" onerror="this.remove()">' : '';
+      return k < 0 ? '<span class="adj sin" title="Este adjunto aún no tiene enlace en Drive">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + '<span>' + t + ' (sin enlace)</span></span>'
+        : '<button type="button" class="adj" data-adj="' + k + '" title="Ver ' + esc(a.nombre) + '">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + img + '<span>' + t + '</span></button>';
+    };
+    const borr = s.borrador && s.borrador.id === sel.id ? s.borrador.t : sel.nota;
+    const res = sel.estado === 'Resuelta', dis = s.guardando ? ' disabled' : '';
+    const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
+      + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div><div><span class="sub">Precisión GPS</span><br><b class="num">' + (sel.precision != null ? sel.precision + ' m' : '—') + '</b></div>'
+      + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '') + '</div>'
+      + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div><div><a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noopener" href="https://maps.google.com/?q=' + sel.lat + ',' + sel.lon + '">Abrir en Google Maps (' + sel.lat.toFixed(5) + ', ' + sel.lon.toFixed(5) + ')</a></div>' : '<span class="sub">Sin posición GPS.</span>')
+      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos</h2>' + ((sel.adjuntos || []).length ? '<div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
+      + '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2><textarea id="incNota" data-id="' + esc(sel.id) + '" rows="3" maxlength="1000" placeholder="Nota: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr) + '</textarea>'
+      + '<div class="barra">' + (res ? '<button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Volver a pendiente</button><button class="btn" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>'
+        : '<button class="btn pri" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Marcar como resuelta</button><button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>')
+      + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '</div></div></div>';
+    return barra + msg + '<div class="fila"><div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lista larga">' + l.map(item).join('') + '</div></div>' + detalle + '</div>';
   }
+
+  // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
+  function miniMapa() {
+    const el = document.getElementById('mapa'), sel = G.incSeleccionada();
+    if (!el || !sel || sel.lat == null) return;
+    G.destruirMapa();
+    const m = L.map(el, { scrollWheelZoom: false }); mapaActual = m;
+    const fondos = crearFondos();
+    let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
+    (fondos[fondo] || fondos['Aérea']).addTo(m);
+    L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
+    G.incFiltradas().filter(i => i.lat != null && i.id !== sel.id).forEach(i => {
+      L.marker([i.lat, i.lon], { icon: L.divIcon({ className: 'mk', html: '<div class="i peq"></div>', iconSize: [18, 16], iconAnchor: [9, 15] }) })
+        .bindTooltip(esc(i.tipo) + ' · ' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia)).on('click', () => { S().incSel = i.id; S().incMsg = null; G.render(); }).addTo(m);
+    });
+    if (sel.precision && sel.precision <= 200) L.circle([sel.lat, sel.lon], { radius: sel.precision, color: '#f2b600', weight: 1, fillOpacity: .15, interactive: false }).addTo(m);
+    L.marker([sel.lat, sel.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: 'mk', html: '<div class="i"></div>', iconSize: [26, 24], iconAnchor: [13, 22] }) }).bindTooltip(esc(sel.tipo)).addTo(m);
+    m.setView([sel.lat, sel.lon], 17);
+    setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 80);
+  }
+
+  // Visor de adjuntos dentro del panel (vista previa de Drive). Flechas o ‹ › para pasar; Escape o ✕ para cerrar.
+  let visor = null;
+  function cerrarVisor() { if (visor) { visor.el.remove(); visor = null; document.body.style.overflow = ''; } }
+  function pintarVisor() {
+    const a = visor.lista[visor.k], id = G.driveId(a.url), u = G.urlSegura(a.url), n = visor.lista.length;
+    visor.el.querySelector('.vt').textContent = (TIPO_ADJ[a.tipo] || 'Archivo') + ' · ' + a.nombre + (n > 1 ? '  (' + (visor.k + 1) + ' de ' + n + ')' : '');
+    visor.el.querySelector('.vdrive').href = u;
+    visor.el.querySelectorAll('.vnav').forEach(b => { b.hidden = n < 2; });
+    visor.el.querySelector('.vmarco').innerHTML = id ? '<iframe title="' + esc(a.nombre) + '" src="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/preview" allow="autoplay; fullscreen" allowfullscreen></iframe>'
+      : '<div class="vacio" style="color:#fff">No se puede mostrar aquí. Usa «Abrir en Drive».</div>';
+  }
+  G.abrirVisor = k => {
+    const sel = G.incSeleccionada(); if (!sel) return;
+    const lista = adjVisibles(sel); if (!lista[k]) return;
+    cerrarVisor();
+    const el = document.createElement('div'); el.className = 'visor'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Adjuntos de la incidencia');
+    el.innerHTML = '<div class="vcab"><span class="vt"></span><a class="btn vdrive" target="_blank" rel="noopener">Abrir en Drive</a><button type="button" class="btn vx" aria-label="Cerrar">✕</button></div>'
+      + '<div class="vcuerpo"><button type="button" class="vnav" data-paso="-1" aria-label="Anterior">‹</button><div class="vmarco"></div><button type="button" class="vnav" data-paso="1" aria-label="Siguiente">›</button></div>';
+    el.addEventListener('click', e => {
+      const b = e.target.closest('.vx,.vnav');
+      if (b && b.classList.contains('vx')) cerrarVisor();
+      else if (b) { visor.k = (visor.k + Number(b.dataset.paso) + visor.lista.length) % visor.lista.length; pintarVisor(); }
+      else if (e.target === el || e.target.classList.contains('vcuerpo')) cerrarVisor();
+    });
+    document.body.appendChild(el); document.body.style.overflow = 'hidden';
+    visor = { el, lista, k }; pintarVisor(); el.querySelector('.vx').focus();
+  };
+  document.addEventListener('keydown', e => {
+    if (!visor) return;
+    if (e.key === 'Escape') cerrarVisor();
+    else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && visor.lista.length > 1) { visor.k = (visor.k + (e.key === 'ArrowRight' ? 1 : -1) + visor.lista.length) % visor.lista.length; pintarVisor(); }
+  });
+
+  // Exporta las incidencias filtradas a CSV (separado por «;» y con coma decimal: lo abre Excel en español tal cual)
+  G.exportarInc = () => {
+    const l = G.incFiltradas(), p = G.periodo();
+    const cel = v => { let t = String(v == null ? '' : v); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const dec = n => n == null ? '' : String(n).replace('.', ',');
+    const cab = ['Fecha', 'Hora', 'Empleado', 'Tipo', 'Comentario', 'Estado', 'Nota supervisor', 'Latitud', 'Longitud', 'Precisión (m)', 'Ver en mapa', 'Adjuntos', 'Enlaces adjuntos'];
+    const filas = l.slice().reverse().map(i => [i.dia.split('-').reverse().join('/'), G.hhmm(i.t), i.nombre, i.tipo, i.comentario, i.estado, i.nota, dec(i.lat), dec(i.lon), dec(i.precision),
+      i.lat != null ? 'https://maps.google.com/?q=' + i.lat + ',' + i.lon : '', (i.adjuntos || []).map(a => a.nombre).join('\n'), (i.adjuntos || []).map(a => G.urlSegura(a.url)).filter(Boolean).join('\n')]);
+    const txt = '﻿' + [cab].concat(filas).map(f => f.map(cel).join(';')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'incidencias_' + p[0] + (p.length > 1 ? '_' + p[p.length - 1] : '') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
 
   /* ---------- Labores ---------- */
   function labores() {
@@ -248,7 +366,7 @@
     resumen: { t: 'Resumen', f: resumen, post: () => pintarMapa(document.getElementById('mapa'), S().data, { emp: S().emp, lab: S().lab, dia: refDia() }, capasPor) },
     mapa: { t: 'Dónde se ha trabajado', f: mapa, post: () => pintarMapa(document.getElementById('mapa'), S().data, { emp: S().emp, lab: S().lab, dia: refDia() }, capasPor) },
     personal: { t: 'Jornales y horas', f: personal },
-    incidencias: { t: 'Incidencias', f: incidencias },
+    incidencias: { t: 'Incidencias', f: incidencias, post: miniMapa },
     labores: { t: 'Labores', f: labores },
     config: { t: 'Configuración', f: config, sinDatos: true }
   };

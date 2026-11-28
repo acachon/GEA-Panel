@@ -45,7 +45,7 @@
     });
     const vi = {};
     const inc = raw.incidencias.filter(i => (cfg.prueba || !i.prueba) && !vi[i.id] && (vi[i.id] = 1))
-      .map(i => Object.assign({}, i, { t: new Date(i.iso).getTime(), dia: G.dayKey(new Date(i.iso)) })).filter(i => !isNaN(i.t)).sort((a, b) => b.t - a.t);
+      .map(i => Object.assign({}, i, { t: new Date(i.iso).getTime(), dia: G.dayKey(new Date(i.iso)), estado: i.estado === 'Resuelta' ? 'Resuelta' : 'Pendiente', nota: i.nota || '' })).filter(i => !isNaN(i.t)).sort((a, b) => b.t - a.t);
     const empleados = Array.from(new Set(acts.map(a => a.nombre).concat(inc.map(i => i.nombre)))).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'));
     return { acts, pts, inc, empleados, hayPrueba: acts.some(a => a.prueba) || inc.some(i => i.prueba) };
   };

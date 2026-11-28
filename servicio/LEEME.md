@@ -15,3 +15,21 @@ Después: Implementar → Gestionar implementaciones → lápiz → Versión: «
 
 El panel usa `activa` (minutos) cuando llega; si la columna «Min activa» está vacía, sigue estimando.
 No se usa la columna «Duración» porque Sheets la entrega como fecha/hora y depende de la zona horaria del script.
+
+# Estado de las incidencias (pendiente / resuelta)
+
+En la pantalla Incidencias, el supervisor puede marcar cada incidencia como **resuelta** (o volver a **pendiente**) y dejar una nota.
+Se guarda en la Hoja «GEA - Registro central», pestaña Incidencias, en tres columnas que el servicio crea solo la primera vez:
+**Estado**, **Nota supervisor** y **Fecha estado**. Las demás columnas no se tocan, y cuando un móvil vuelve a sincronizar una
+incidencia, estas tres columnas se conservan.
+
+Para activarlo hay que poner en Apps Script el código nuevo del servicio (archivo
+«GEA - Servicio Registro central (con lectura para el panel).gs.txt», en la carpeta del proyecto; no está en este repositorio porque lleva las claves):
+
+1. En la Hoja: Extensiones → Apps Script → sustituir todo el código por el del archivo y guardar.
+2. Implementar → Gestionar implementaciones → lápiz → Versión: «Nueva versión» → Implementar (la dirección del servicio no cambia).
+
+Cambios en el código: nueva petición `{ tipo: 'estado', clave: CLAVE_LECTURA, id, estado: 'Pendiente'|'Resuelta', nota }`
+(función `guardarEstado`), `leer()` devuelve `estado`, `nota` y `fechaEstado` de cada incidencia, y `volcar()` conserva las
+columnas del Panel al actualizar filas de Incidencias. Mientras no se actualice el servicio, el panel sigue funcionando y
+muestra todas las incidencias como pendientes; al intentar marcar una avisa de que falta este paso.

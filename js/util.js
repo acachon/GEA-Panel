@@ -15,6 +15,8 @@
   G.diaLargo = k => { const d = G.parseDay(k); return DS[d.getDay()] + ' ' + d.getDate() + ' de ' + MS[d.getMonth()]; };
   // Solo se enlazan adjuntos alojados en Google (los enlaces vienen de una hoja que puede editarse a mano)
   G.urlSegura = u => /^https:\/\/(drive|docs)\.google\.com\//.test(u || '') ? u : '';
+  // ID de un archivo de Drive a partir de su enlace (…/file/d/ID/… o …?id=ID)
+  G.driveId = u => { const m = String(u || '').match(/\/d\/([\w-]{20,})/) || String(u || '').match(/[?&]id=([\w-]{20,})/); return m ? m[1] : ''; };
   const PAL = ['#b0155a', '#7a3fc0', '#1f7a31', '#1f5fb5', '#4b5563', '#c2410c', '#0e7490', '#a16207'];
   G.colorEmp = (lista, nombre) => PAL[Math.max(0, lista.indexOf(nombre)) % PAL.length];
   G.inicial = n => (String(n || '?').trim()[0] || '?').toUpperCase();

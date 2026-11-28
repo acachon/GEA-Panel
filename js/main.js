@@ -6,8 +6,14 @@
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
-  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', incSel: null, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
-  G.periodo = () => { const h = hoy(); return S.modo === 'hoy' ? [h] : S.modo === 'ayer' ? [G.addDays(h, -1)] : S.modo === '7d' ? Array.from({ length: 7 }, (_, i) => G.addDays(h, i - 6)) : [S.dia]; };
+  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', desde: '', hasta: '', incSel: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
+  const MAX_DIAS = 92; // rango máximo (Desde / Hasta de Incidencias)
+  const ultimos = n => { const h = hoy(); return Array.from({ length: n }, (_, i) => G.addDays(h, i - n + 1)); };
+  G.periodo = () => {
+    const h = hoy();
+    if (S.modo === 'rango') { const l = []; for (let d = S.desde; d <= S.hasta && l.length < MAX_DIAS; d = G.addDays(d, 1)) l.push(d); return l.length ? l : [h]; }
+    return S.modo === 'hoy' ? [h] : S.modo === 'ayer' ? [G.addDays(h, -1)] : S.modo === '7d' ? ultimos(7) : S.modo === '30d' ? ultimos(30) : [S.dia];
+  };
   const conectado = () => S.cfg.demo || (S.cfg.url && S.cfg.clave);
 
   async function cargar(forzar, silencioso) {
@@ -27,7 +33,7 @@
     return '<div class="cab"><div><span class="lbl">Finca El Caimbo · ' + fecha + '</span><h1>' + v.t + '</h1><div class="barra" style="margin-top:6px">'
       + (S.actualizado ? '<span class="sub">Actualizado ' + G.hhmm(S.actualizado) + '</span>' : '')
       + (S.cfg.demo ? '<span class="chip c-av">Datos de ejemplo</span>' : D && D.hayPrueba ? '<span class="chip c-av">Incluye datos de prueba</span>' : '')
-      + '</div></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + '</div>'
+      + '</div></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
       + '<label class="campo"><span>Día</span><input type="date" id="fDia" max="' + hoy() + '" value="' + (p.length === 1 ? p[0] : '') + '"></label>'
       + (D ? '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>'
         + (S.vista === 'resumen' || S.vista === 'mapa' || S.vista === 'labores' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
@@ -50,13 +56,31 @@
     if (hayMapa && document.getElementById('mapa') && window.L) v.post();
   }
 
+  G.render = render;
+
+  // Pendiente / Resuelta (con la nota escrita) de la incidencia elegida
+  async function guardarEstado(id, valor) {
+    const caja = $('#incNota'), nota = caja ? caja.value.trim() : '';
+    S.borrador = { id, t: nota }; S.guardando = true; S.incMsg = null; render();
+    try {
+      const r = await G.api.estado(S.cfg, id, valor, nota), i = S.data && S.data.inc.find(x => x.id === id);
+      if (i) Object.assign(i, { estado: r.estado, nota: r.nota, fechaEstado: r.fechaEstado });
+      S.borrador = null; S.incSel = id;
+      S.incMsg = { ok: true, t: (i ? '«' + (i.comentario || i.tipo) + '»: ' : '') + (r.estado === 'Resuelta' ? 'resuelta' : 'pendiente') + (r.nota ? ', con la nota guardada.' : '.') };
+    } catch (e) { S.incMsg = { ok: false, t: 'No se pudo guardar: ' + ((e && e.message) || e) }; }
+    S.guardando = false; render();
+  }
+
   function ruta() { const v = (location.hash || '#resumen').slice(1); S.vista = G.vistas[v] ? v : 'resumen'; render(); }
   window.addEventListener('hashchange', ruta);
 
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],#bAct,#bProbar'); if (!t) return;
+    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-estado],[data-adj],#bAct,#bProbar,#bCsv'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
-    else if (t.dataset.inc) { S.incSel = t.dataset.inc; render(); }
+    else if (t.dataset.inc) { S.incSel = t.dataset.inc; S.incMsg = null; render(); }
+    else if (t.dataset.estado) { if (!S.guardando) guardarEstado(t.dataset.id, t.dataset.estado); }
+    else if (t.dataset.adj) G.abrirVisor(Number(t.dataset.adj));
+    else if (t.id === 'bCsv') G.exportarInc();
     else if (t.dataset.ir) { S.emp = t.dataset.emp || ''; }
     else if (t.dataset.demo) { S.cfg.demo = true; guardarCfg(S.cfg); cargar(true); }
     else if (t.id === 'bAct') { cargar(true); }
@@ -67,8 +91,27 @@
     if (t.id === 'fDia') { if (t.value) { S.dia = t.value; S.modo = 'dia'; cargar(false); } }
     else if (t.id === 'fEmp') { S.emp = t.value; render(); }
     else if (t.id === 'fLab') { S.lab = t.value; render(); }
-    else if (t.id === 'fTipo') { S.tipo = t.value; render(); }
+    else if (t.id === 'fTipo') { S.tipo = t.value; S.incMsg = null; render(); }
+    else if (t.id === 'fEst') { S.est = t.value; S.incMsg = null; render(); }
+    else if (t.id === 'fDesde' || t.id === 'fHasta') {
+      const p = G.periodo(); let d = $('#fDesde').value || p[0], h = $('#fHasta').value || p[p.length - 1];
+      if (d > h) [d, h] = [h, d];
+      if (G.addDays(d, MAX_DIAS - 1) < h) { d = G.addDays(h, -(MAX_DIAS - 1)); alert('Como mucho se ven ' + MAX_DIAS + ' días seguidos: el periodo empieza el ' + G.diaLargo(d) + '.'); }
+      S.desde = d; S.hasta = h; S.modo = d === h ? 'dia' : 'rango'; S.dia = d; S.incMsg = null; cargar(false);
+    }
     else if (t.dataset && t.dataset.capa) { G.capas[t.dataset.capa] = t.checked; G.repintarMapa(); }
+  });
+  // Buscar en Incidencias: filtra mientras se escribe sin perder el cursor; la nota se guarda como borrador
+  let tBuscar = null;
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.id === 'incNota') S.borrador = { id: t.dataset.id, t: t.value };
+    if (t.id !== 'fBuscar') return;
+    S.q = t.value; clearTimeout(tBuscar);
+    tBuscar = setTimeout(() => {
+      const pos = t.selectionStart; render();
+      const n = $('#fBuscar'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* sin cursor */ } }
+    }, 250);
   });
   document.addEventListener('submit', e => {
     if (e.target.id !== 'formCfg') return; e.preventDefault();
@@ -85,6 +128,7 @@
   }
 
   // Refresco automático cada 2 minutos mientras se mira el día en curso
-  setInterval(() => { if (!document.hidden && S.vista !== 'config' && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
+  // (no mientras se escribe una nota o una búsqueda, ni con el visor de adjuntos abierto)
+  setInterval(() => { if (!document.hidden && S.vista !== 'config' && !S.guardando && !document.querySelector('.visor') && !(document.activeElement && /^(incNota|fBuscar)$/.test(document.activeElement.id)) && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
   ruta(); cargar(false);
 })();
