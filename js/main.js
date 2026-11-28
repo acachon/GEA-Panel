@@ -33,8 +33,7 @@
     const ddmm = k => k.split('-').reverse().slice(0, 2).join('/');
     const txtDias = p.length === 1 ? p[0].split('-').reverse().join('/') : seguidos ? ddmm(p[0]) + ' – ' + ddmm(p[p.length - 1]) : p.length + ' días';
     const opts = (lista, sel, vacio) => '<option value="">' + vacio + '</option>' + lista.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === sel ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
-    const aviso = S.cfg.demo ? '<span class="chip c-av">Datos de ejemplo</span>' : D && D.hayPrueba ? '<span class="chip c-av">Incluye datos de prueba</span>' : '';
-    return '<div class="cab"><div class="barra"><h1>' + v.t + '</h1>' + aviso + '</div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
+    return '<div class="cab"><div class="barra"><h1>' + v.t + '</h1></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
       + '<div class="calw"><button type="button" class="campo" id="bCal" aria-haspopup="dialog" aria-expanded="' + !!S.cal + '" title="Elegir uno o varios días"><span>Días</span><b>' + txtDias + '</b>' + ICO_CAL + '</button>' + (S.cal ? htmlCal() : '') + '</div>'
       + (D ? (S.vista === 'incidencias' ? '' : '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>')
         + (S.vista === 'resumen' || S.vista === 'mapa' || S.vista === 'labores' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
@@ -48,7 +47,9 @@
     const p = G.periodo(), el = $('#navEstado'); if (!el) return;
     const fecha = p.length === 1 ? G.diaLargo(p[0]) : esSeguido(p) ? G.diaCorto(p[0]) + ' – ' + G.diaCorto(p[p.length - 1]) : p.length + ' días elegidos';
     el.innerHTML = '<span class="ed"><span class="lbl">Datos de</span> <b>' + fecha + '</b></span>'
-      + '<span class="eh">' + (S.cargando ? 'Cargando…' : S.actualizado ? 'Actualizado a las ' + G.hhmm(S.actualizado) : conectado() ? '' : 'Sin conexión') + '</span>';
+      + '<span class="eh">' + (S.cargando ? 'Cargando…' : S.actualizado ? 'Actualizado a las ' + G.hhmm(S.actualizado) : conectado() ? '' : 'Sin conexión') + '</span>'
+      // Aviso de datos de ejemplo / de prueba: en el menú, bajo la hora de actualización (no en cada pestaña)
+      + (S.cfg.demo ? '<span class="ej">Datos de ejemplo</span>' : S.data && S.data.hayPrueba ? '<span class="ej">Incluye datos de prueba</span>' : '');
   }
 
   /* Calendario de la cabecera: se pueden marcar varios días (con Mayús, todos los de un tramo) y «Aplicar» los carga */

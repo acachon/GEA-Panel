@@ -225,3 +225,6 @@ button.campo svg{color:var(--olivo)}
 .leyenda .bordes{margin-left:auto}
 /* Icono de seguimiento en el listado (la incidencia tiene apuntes): bocadillo y número de apuntes */
 .segico{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:800;color:var(--olivo);background:#eef4e2;border:1px solid #cfe0b4;border-radius:999px;padding:2px 7px}
+/* Aviso «Datos de ejemplo» en el menú, bajo la hora de actualización */
+#nav .estado .ej{align-self:flex-start;margin-top:4px;padding:2px 8px;border-radius:999px;background:#f6d77a;color:#3d2a00;font-size:11px;font-weight:800}
+@media (max-width:900px){#nav .estado .ej{margin-top:0;align-self:center}}
