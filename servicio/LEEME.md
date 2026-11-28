@@ -24,7 +24,7 @@ Se guarda en la Hoja «GEA - Registro central», pestaña Incidencias, en tres c
 incidencia, estas tres columnas se conservan.
 
 Para activarlo hay que poner en Apps Script el código nuevo del servicio (archivo
-«GEA - Servicio Registro central (con lectura para el panel).gs.txt», en la carpeta del proyecto; no está en este repositorio porque lleva las claves):
+«GEA - Servicio Registro central (Apps Script).gs.txt», en la carpeta «Actividades» de Drive, junto a la Hoja «GEA - Registro central»; es siempre la versión vigente y no está en este repositorio porque lleva las claves):
 
 1. En la Hoja: Extensiones → Apps Script → sustituir todo el código por el del archivo y guardar.
 2. Implementar → Gestionar implementaciones → lápiz → Versión: «Nueva versión» → Implementar (la dirección del servicio no cambia).
