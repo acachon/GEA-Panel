@@ -277,16 +277,14 @@
       const m = x.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*\[([^\]]*)\]\s*(.*)$/);
       return m ? '<li><span class="hq">[' + esc(m[1]) + '] [' + esc(m[2]) + ']</span> ' + esc(m[3]) + '</li>' : '<li>' + esc(x) + '</li>';
     }).join('');
-    const usuario = G.usuario();
     const seguimiento = '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2>'
       + (multi ? '<span class="sub">El comentario se añadirá al seguimiento de <b>cada una de las ' + sels.length + ' incidencias</b>, y el estado que elijas será el de todas.</span>'
         : hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
       + '<div class="segfila"><textarea id="incNota" data-id="' + esc(clave) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
-      + '<label class="campo segest"><span>Estado</span><select id="incEstado" data-id="' + esc(clave) + '"' + dis + '>'
-      + (comun ? '' : '<option value=""' + (borr.est === '' ? ' selected' : '') + '>Sin cambiar</option>')
-      + '<option' + (borr.est === 'Pendiente' ? ' selected' : '') + '>Pendiente</option><option' + (borr.est === 'Resuelta' ? ' selected' : '') + '>Resuelta</option></select></label></div>'
-      + '<div class="barra"><span class="sub">Firmará: <b>' + esc(usuario) + '</b> · <a href="#config">cambiar</a></span>'
-      + '<span style="flex:1"></span>' + (s.guardando ? '<span class="sub" id="segProg">' + esc(typeof s.guardando === 'string' ? s.guardando : 'Guardando…') + '</span>' : '')
+      // Estado: dos botones a la derecha del texto; el activo se destaca y al pulsar el otro cambia (se guarda con «Actualizar»)
+      + '<div class="segest" role="group" aria-label="Estado"><input type="hidden" id="incEstado" data-id="' + esc(clave) + '" value="' + esc(borr.est) + '">'
+      + ['Pendiente', 'Resuelta'].map(v => '<button type="button" class="estb ' + (v === 'Resuelta' ? 'r' : 'p') + (borr.est === v ? ' on' : '') + '" data-est="' + v + '" aria-pressed="' + (borr.est === v) + '"' + dis + '>' + v + '</button>').join('') + '</div></div>'
+      + '<div class="barra"><span style="flex:1"></span>' + (s.guardando ? '<span class="sub" id="segProg">' + esc(typeof s.guardando === 'string' ? s.guardando : 'Guardando…') + '</span>' : '')
       + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(clave) + '"' + dis + '>' + (multi ? 'Actualizar las ' + sels.length : 'Actualizar') + '</button></div></div>';
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
       + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'

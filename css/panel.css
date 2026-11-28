@@ -184,9 +184,9 @@ button.campo svg{color:var(--olivo)}
 .hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
 .hist li{padding:8px 10px;border-radius:8px;background:#f4f3ec;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
 .hist .hq{font-weight:700;color:var(--olivo);font-variant-numeric:tabular-nums}
-.segfila{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
-.segfila textarea{flex:1 1 220px;width:auto;min-height:64px}
-.segfila .segest{flex:0 0 auto;align-self:flex-start}
+.segfila{display:flex;gap:8px;align-items:stretch}
+.segfila textarea{flex:1 1 auto;min-width:0;width:auto;min-height:76px}
+.segfila .segest{flex:0 0 108px;display:flex;flex-direction:column;gap:6px}
 .visor .vdrive[hidden]{display:none}
 .vdemo{display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;text-align:center}
 .vdemo svg{width:72px;height:72px}
@@ -214,3 +214,10 @@ button.campo svg{color:var(--olivo)}
 .selchip .nro{flex:none;min-width:22px;height:22px;padding:0 4px;border-radius:11px;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
 .selchip .scn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .selchip .chip.tipo{flex:0 0 112px;width:112px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+/* Estado del seguimiento: dos botones; el activo, relleno con su color (ámbar pendiente, verde resuelta) */
+.estb{flex:1;font:inherit;font-size:13px;font-weight:700;border-radius:10px;padding:6px 8px;cursor:pointer;background:#fff;color:var(--suave);border:1.5px solid var(--borde)}
+.estb:hover:not(:disabled){border-color:var(--olivo);color:var(--tinta)}
+.estb.p.on{background:#fdf0d5;border-color:#d99a1e;color:var(--aviso)}
+.estb.r.on{background:#e3f1dc;border-color:#3d8b37;color:var(--ok)}
+.estb.on::before{content:'● ';font-size:10px;vertical-align:1px}
+.estb:disabled{opacity:.6;cursor:default}

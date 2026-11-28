@@ -172,8 +172,14 @@
     const tc = e.target.closest('#bCal,[data-cald],[data-calm],[data-calx]');
     if (tc) { clicCal(tc, e); return; }
     if (S.cal && !e.target.closest('.cal')) { S.cal = null; pintarCal(); }
-    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],#bSeg,#bAct,#bProbar,#bCsv,#bQuitarSel'); if (!t) return;
+    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],[data-est],#bSeg,#bAct,#bProbar,#bCsv,#bQuitarSel'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
+    else if (t.dataset.est) {
+      // Botones de estado del seguimiento: el pulsado pasa a ser el elegido; si ya lo era, se cambia al otro (toggle)
+      const h = $('#incEstado'), v = h.value === t.dataset.est ? (t.dataset.est === 'Resuelta' ? 'Pendiente' : 'Resuelta') : t.dataset.est;
+      h.value = v; document.querySelectorAll('.estb').forEach(b => { b.classList.toggle('on', b.dataset.est === v); b.setAttribute('aria-pressed', b.dataset.est === v); });
+      S.borrador = { id: h.dataset.id, t: $('#incNota').value, est: v };
+    }
     else if (t.dataset.inc) G.elegirInc(t.dataset.inc, e.target.classList.contains('selc') || e.ctrlKey || e.metaKey, e.shiftKey);
     else if (t.id === 'bQuitarSel') { S.incSels = []; S.incAncla = null; S.borrador = null; S.incMsg = null; render(); }
     else if (t.id === 'bSeg') { if (!S.guardando) guardarSeguimiento(t.dataset.id); }
