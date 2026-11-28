@@ -224,7 +224,7 @@
   // Número de apuntes de seguimiento de una incidencia (una línea de la nota por apunte)
   G.apuntes = i => String(i.nota || '').split('\n').filter(x => x.trim()).length;
   const ICO_SEG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>';
-  const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado', seguimiento: 'Seguimiento' };
+  const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado', seguimiento: 'Seguimiento', adjuntos: 'Adjuntos' };
   G.incFiltradas = () => {
     const s = S(), q = normal(s.q).trim(), es = (a, b) => String(a || '').localeCompare(String(b || ''), 'es');
     const l = s.data.inc.filter(i => (!s.tipo || i.tipo === s.tipo) && (!s.est || i.estado === s.est)
@@ -232,7 +232,9 @@
     // Dentro de cada grupo, la más reciente primero (los datos ya vienen así). Por seguimiento: primero las que tienen apuntes, la de cambio más reciente antes
     const cambio = i => (i.fechaEstado && new Date(i.fechaEstado).getTime()) || 0;
     const cmp = { operario: (a, b) => es(a.nombre, b.nombre), tipo: (a, b) => es(a.tipo, b.tipo), estado: (a, b) => (a.estado === 'Resuelta') - (b.estado === 'Resuelta'),
-      seguimiento: (a, b) => (G.apuntes(b) > 0) - (G.apuntes(a) > 0) || cambio(b) - cambio(a) }[s.orden];
+      seguimiento: (a, b) => (G.apuntes(b) > 0) - (G.apuntes(a) > 0) || cambio(b) - cambio(a),
+      // Por adjuntos: primero las que más tienen
+      adjuntos: (a, b) => (b.adjuntos || []).length - (a.adjuntos || []).length }[s.orden];
     return cmp ? l.sort((a, b) => cmp(a, b) || b.t - a.t) : l;
   };
   // Selección (una o varias filas): las elegidas que siguen visibles con los filtros, en el orden del listado; si no hay ninguna, la primera
