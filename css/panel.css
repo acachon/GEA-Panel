@@ -92,7 +92,7 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 #nav .marca .pin{width:30px;height:36px}
 #nav .marca .logo{padding:0;line-height:1}
 /* Incidencias: buscador, estado, mapa pequeño, adjuntos y seguimiento */
-.campo.buscar{flex:1 1 220px}.campo.buscar input{flex:1;min-width:0}
+.campo.buscar{flex:1 1 240px;max-width:380px;margin-left:auto}.campo.buscar input{flex:1;min-width:0}
 .lista .it.res{opacity:.62}.lista .it.res.sel{opacity:1}
 .aviso.ok{background:#e1f0d4;color:var(--ok)}
 .mapa.mini{height:230px}
@@ -223,3 +223,5 @@ button.campo svg{color:var(--olivo)}
 .leyenda span{display:inline-flex;align-items:center;gap:5px}
 .leyenda svg{flex:none;filter:drop-shadow(0 0 1px rgba(0,0,0,.45))}
 .leyenda .bordes{margin-left:auto}
+/* Icono de seguimiento en el listado (la incidencia tiene apuntes): bocadillo y número de apuntes */
+.segico{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:800;color:var(--olivo);background:#eef4e2;border:1px solid #cfe0b4;border-radius:999px;padding:2px 7px}

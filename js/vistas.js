@@ -221,13 +221,18 @@
   const esDemo = a => /^demo:/.test(a.url || '');
   const adjVisibles = i => (i.adjuntos || []).filter(a => G.urlSegura(a.url) || esDemo(a));
   // Incidencias que pasan los filtros de la pantalla (tipo, estado y texto buscado), en el orden elegido
-  const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado' };
+  // Número de apuntes de seguimiento de una incidencia (una línea de la nota por apunte)
+  G.apuntes = i => String(i.nota || '').split('\n').filter(x => x.trim()).length;
+  const ICO_SEG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>';
+  const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado', seguimiento: 'Seguimiento' };
   G.incFiltradas = () => {
     const s = S(), q = normal(s.q).trim(), es = (a, b) => String(a || '').localeCompare(String(b || ''), 'es');
     const l = s.data.inc.filter(i => (!s.tipo || i.tipo === s.tipo) && (!s.est || i.estado === s.est)
       && (!q || normal([i.comentario, i.tipo, i.nombre, i.nota].join(' ')).includes(q)));
-    // Dentro de cada grupo, la más reciente primero (los datos ya vienen así)
-    const cmp = { operario: (a, b) => es(a.nombre, b.nombre), tipo: (a, b) => es(a.tipo, b.tipo), estado: (a, b) => (a.estado === 'Resuelta') - (b.estado === 'Resuelta') }[s.orden];
+    // Dentro de cada grupo, la más reciente primero (los datos ya vienen así). Por seguimiento: primero las que tienen apuntes, la de cambio más reciente antes
+    const cambio = i => (i.fechaEstado && new Date(i.fechaEstado).getTime()) || 0;
+    const cmp = { operario: (a, b) => es(a.nombre, b.nombre), tipo: (a, b) => es(a.tipo, b.tipo), estado: (a, b) => (a.estado === 'Resuelta') - (b.estado === 'Resuelta'),
+      seguimiento: (a, b) => (G.apuntes(b) > 0) - (G.apuntes(a) > 0) || cambio(b) - cambio(a) }[s.orden];
     return cmp ? l.sort((a, b) => cmp(a, b) || b.t - a.t) : l;
   };
   // Selección (una o varias filas): las elegidas que siguen visibles con los filtros, en el orden del listado; si no hay ninguna, la primera
@@ -260,7 +265,9 @@
     // El número (con el color del tipo) es el mismo que lleva su triángulo en el mapa
     // Casilla de cada fila: suma o quita esa incidencia de la selección (también Ctrl+clic; Mayús+clic elige un tramo)
     const item = (i, k) => '<div class="it clic' + (enSel.has(i.id) ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><input type="checkbox" class="selc" aria-label="Seleccionar la incidencia ' + (k + 1) + '"' + (enSel.has(i.id) ? ' checked' : '') + '><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Número ' + (k + 1) + ' en el mapa">' + (k + 1) + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
-      + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
+      + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '')
+      // Icono de seguimiento (entre los adjuntos y el estado) si la incidencia tiene algún apunte
+      + (G.apuntes(i) ? '<span class="segico num" title="' + G.apuntes(i) + (G.apuntes(i) > 1 ? ' apuntes' : ' apunte') + ' de seguimiento" aria-label="' + G.apuntes(i) + ' apuntes de seguimiento">' + ICO_SEG + G.apuntes(i) + '</span>' : '') + chipEst(i.estado) + '</div>';
     // Adjuntos de la selección (de todas si hay varias): miniatura de las fotos (si Drive la da) e icono para vídeos y audios;
     // con varias, delante del icono va el número de su incidencia en el listado. Al pulsar se abren en el visor.
     const va = G.adjsSeleccion(), todosAdj = sels.flatMap(i => (i.adjuntos || []).map(a => ({ a, i, n: l.indexOf(i) + 1 })));
