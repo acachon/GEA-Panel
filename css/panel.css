@@ -126,7 +126,7 @@ button.campo b{font-weight:700}
 button.campo svg{color:var(--olivo)}
 .cal{position:absolute;right:0;top:calc(100% + 6px);z-index:1500;width:300px;background:#fff;border:1px solid var(--borde);border-radius:12px;box-shadow:0 8px 24px rgba(16,38,26,.18);padding:12px;display:flex;flex-direction:column;gap:10px}
 .calcab{display:flex;align-items:center;justify-content:space-between}
-.calcab b{text-transform:capitalize}
+.calcab b{font-weight:800}
 .calcab button{width:36px;height:36px;border:0;border-radius:8px;background:#f0f5e4;color:var(--olivo);font-size:20px;cursor:pointer}
 .calcab button:disabled{opacity:.35;cursor:default}
 .calsem,.caldias{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
@@ -171,3 +171,10 @@ button.campo svg{color:var(--olivo)}
   #nav .estado{order:3;flex:1 1 100%;margin:0;padding:2px 2px 0;background:none;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:12px}
   #nav .estado b{display:inline}
 }
+/* Pie del calendario: contador y botones discretos */
+.calpie{display:flex;align-items:center;gap:4px;border-top:1px solid #eceee3;padding-top:8px}
+.calb{min-height:32px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--suave);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.calb:hover{background:#f0f5e4;color:var(--tinta)}
+.calb.pri{color:var(--olivo)}
+.calb.pri:hover{background:#e1f0d4}
+.calb:disabled{opacity:.4;cursor:default;background:transparent}

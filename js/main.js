@@ -53,7 +53,7 @@
   const ICO_CAL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
   function htmlCal() {
     const c = S.cal, [y, m] = c.mes.split('-').map(Number), h = hoy(), n = new Date(y, m, 0).getDate(), hueco = (new Date(y, m - 1, 1).getDay() + 6) % 7;
-    const nombre = new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const nombre = new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^./, x => x.toUpperCase());
     let celdas = '<span></span>'.repeat(hueco);
     for (let d = 1; d <= n; d++) {
       const k = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
@@ -61,8 +61,7 @@
     }
     return '<div class="cal" role="dialog" aria-label="Elegir días"><div class="calcab"><button type="button" data-calm="-1" aria-label="Mes anterior">‹</button><b>' + nombre + '</b><button type="button" data-calm="1" aria-label="Mes siguiente"' + (c.mes >= h.slice(0, 7) ? ' disabled' : '') + '>›</button></div>'
       + '<div class="calsem"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div><div class="caldias">' + celdas + '</div>'
-      + '<div class="sub">Pulsa los días que quieras ver. Con Mayús pulsada se marcan todos los días de un tramo.</div>'
-      + '<div class="barra"><b class="sub">' + c.sel.size + (c.sel.size === 1 ? ' día' : ' días') + '</b><span style="flex:1"></span><button type="button" class="btn" data-calx="limpiar">Limpiar</button><button type="button" class="btn pri" data-calx="aplicar"' + (c.sel.size ? '' : ' disabled') + '>Aplicar</button></div></div>';
+      + '<div class="calpie"><span class="sub">' + c.sel.size + (c.sel.size === 1 ? ' día' : ' días') + '</span><span style="flex:1"></span><button type="button" class="calb" data-calx="limpiar"' + (c.sel.size ? '' : ' disabled') + '>Limpiar</button><button type="button" class="calb pri" data-calx="aplicar"' + (c.sel.size ? '' : ' disabled') + '>Aplicar</button></div></div>';
   }
   // Repinta solo el calendario (sin volver a dibujar la pantalla ni el mapa)
   function pintarCal() {
