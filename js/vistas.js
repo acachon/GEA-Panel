@@ -296,7 +296,9 @@
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
       + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(tipoC || 'Varios tipos') + '</span>' + (estC ? chipEst(estC) : '')
       + (multi ? '<span style="flex:1"></span><button type="button" class="btn" id="bQuitarSel">Quitar selección</button>' : '') + '</div>'
-      + '<h2 style="font-size:20px;margin-top:6px">' + (multi ? sels.length + ' incidencias seleccionadas' : esc(sel.comentario || 'Sin comentario')) + '</h2></div>'
+      // Título y, a su derecha, el botón para abrir la ubicación en Google Maps (solo con una incidencia con GPS)
+      + '<div style="display:flex;align-items:flex-start;gap:10px;margin-top:6px"><h2 style="font-size:20px;flex:1;min-width:0">' + (multi ? sels.length + ' incidencias seleccionadas' : esc(sel.comentario || 'Sin comentario')) + '</h2>'
+      + (!multi && sel.lat != null ? '<a class="ico gmaps" href="https://maps.google.com/?q=' + encodeURIComponent(sel.lat + ',' + sel.lon) + '" target="_blank" rel="noopener" title="Abrir en Google Maps" aria-label="Abrir en Google Maps">' + ICO_GMAPS + '</a>' : '') + '</div></div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(nombreC || 'Varios') + '</b></div>'
       + (multi ? '<div><span class="sub">Fecha</span><br><b class="num">' + (diaC ? G.diaCorto(diaC) : 'Varias') + '</b></div>'
         : '<div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
@@ -327,12 +329,6 @@
     let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
     (fondos[fondo] || fondos['Aérea']).addTo(m);
     L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
-    // Abrir en Google Maps: icono dentro del mapa, bajo el zoom
-    const GM = L.Control.extend({ options: { position: 'topleft' }, onAdd() {
-      const c = L.DomUtil.create('div', 'leaflet-bar ubic'), a = L.DomUtil.create('a', '', c);
-      a.href = 'https://maps.google.com/?q=' + sel.lat + ',' + sel.lon; a.target = '_blank'; a.rel = 'noopener'; a.title = 'Abrir en Google Maps'; a.setAttribute('aria-label', a.title); a.innerHTML = ICO_GMAPS;
-      L.DomEvent.disableClickPropagation(c); return c; } });
-    new GM().addTo(m);
     // Cada incidencia con su número del listado (mismo orden y filtros)
     // Las elegidas, grandes y con borde lima; las demás, pequeñas y atenuadas (clic: elegir solo esa; Ctrl/Mayús+clic: sumarla)
     l.forEach((i, k) => {

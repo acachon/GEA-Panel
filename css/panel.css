@@ -77,7 +77,6 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 /* Controles del mapa (iguales que en la pestaña Supervisor de la app) */
 .mapa.completa{position:fixed!important;inset:0;height:auto;z-index:2500;border:0;border-radius:0}
 .leaflet-container .completo a{display:flex;align-items:center;justify-content:center;font:700 20px var(--display,inherit)}
-.leaflet-container .ubic a{display:flex;align-items:center;justify-content:center}
 /* Capa del Catastro: líneas blancas sobre imagen aérea o satélite */
 .cat-lineas{filter:invert(1) drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .mapa.fondo-mapa .cat-lineas{filter:none}
@@ -218,3 +217,4 @@ button.campo svg{color:var(--olivo)}
 /* Con varias incidencias elegidas, cada adjunto lleva delante el número de su incidencia */
 .adj{position:relative}
 .adj .adjn{position:absolute;top:4px;left:4px;z-index:2;min-width:20px;height:20px;padding:0 4px;border-radius:10px;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
+.ico.gmaps{flex:none;text-decoration:none}
