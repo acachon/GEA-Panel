@@ -236,3 +236,14 @@ button.campo svg{color:var(--olivo)}
   .lista .it > .chip,.lista .it > .segico{flex-shrink:0}
   .lista .it .itx{order:10;flex:1 1 100% !important;padding-left:26px}
 }
+/* Secciones plegables de la ficha de incidencia (Adjuntos, Mapa, Seguimiento) */
+.pleg{border-top:1px solid #eceee3;padding-top:10px}
+.pleg > summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.pleg > summary::-webkit-details-marker{display:none}
+.pleg > summary h2{font-size:14px;margin:0;display:flex;align-items:center;gap:6px}
+.pleg > summary::after{content:'';margin-left:auto;width:8px;height:8px;border-right:2px solid var(--suave);border-bottom:2px solid var(--suave);transform:rotate(45deg);transition:transform .15s;margin-right:6px}
+.pleg:not([open]) > summary::after{transform:rotate(-45deg)}
+.pleg > summary:hover h2{color:var(--olivo)}
+.pleg > summary:focus-visible{outline:2px solid var(--lima);outline-offset:2px;border-radius:6px}
+.pleg > .plegc{margin-top:10px}
+.pleg .gestion{border-top:0;padding-top:0}

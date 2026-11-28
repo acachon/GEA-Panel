@@ -6,7 +6,7 @@
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
-  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSels: [], incAncla: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
+  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSels: [], incAncla: null, plegadas: {}, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
   const MAX_DIAS = 92; // días que se pueden elegir a la vez en el calendario
   const ultimos = n => { const h = hoy(); return Array.from({ length: n }, (_, i) => G.addDays(h, i - n + 1)); };
   G.periodo = () => {
@@ -191,6 +191,14 @@
     else if (t.id === 'bAct') { cargar(true); }
     else if (t.id === 'bProbar') probar();
   });
+  // Secciones plegables de la ficha de incidencia: se recuerda cuáles están plegadas. Al desplegar el mapa se vuelve a pintar,
+  // porque Leaflet no puede medirse mientras está oculto. (El evento «toggle» no burbujea: se escucha en captura.)
+  document.addEventListener('toggle', e => {
+    const d = e.target; if (!d.dataset || !d.dataset.pleg) return;
+    const k = d.dataset.pleg, plegada = !d.open; if (!!S.plegadas[k] === plegada) return;
+    S.plegadas[k] = plegada;
+    if (k === 'mapa' && !plegada) render();
+  }, true);
   // Mayús+clic en el listado elige un tramo: que no seleccione además el texto de las filas
   document.addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.it[data-inc]')) e.preventDefault(); });
   document.addEventListener('change', e => {

@@ -287,15 +287,17 @@
       const m = x.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*\[([^\]]*)\]\s*(.*)$/);
       return m ? '<li><span class="hq">[' + esc(m[1]) + '] [' + esc(m[2]) + ']</span> ' + esc(m[3]) + '</li>' : '<li>' + esc(x) + '</li>';
     }).join('');
-    const seguimiento = '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2>'
+    // Secciones plegables de la ficha (Adjuntos, Mapa, Seguimiento): abiertas por defecto; se recuerda cuáles se han plegado
+    const plegable = (k, titulo, cuerpo) => '<details class="pleg" data-pleg="' + k + '"' + ((s.plegadas || {})[k] ? '' : ' open') + '><summary><h2>' + titulo + '</h2></summary><div class="plegc">' + cuerpo + '</div></details>';
+    const seguimiento = plegable('seg', 'Seguimiento', '<div class="gestion">'
       + (multi ? '<span class="sub">El comentario se añadirá al seguimiento de <b>cada una de las ' + sels.length + ' incidencias</b>, y el estado que elijas será el de todas.</span>'
-        : hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
+        : hist ? '<ol class="hist">' + hist + '</ol>' : '')
       + '<div class="segfila"><textarea id="incNota" data-id="' + esc(clave) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
       // Estado: dos botones a la derecha del texto; el activo se destaca y al pulsar el otro cambia (se guarda con «Actualizar»)
       + '<div class="segest" role="group" aria-label="Estado"><input type="hidden" id="incEstado" data-id="' + esc(clave) + '" value="' + esc(borr.est) + '">'
       + ['Pendiente', 'Resuelta'].map(v => '<button type="button" class="estb ' + (v === 'Resuelta' ? 'r' : 'p') + (borr.est === v ? ' on' : '') + '" data-est="' + v + '" aria-pressed="' + (borr.est === v) + '"' + dis + '>' + v + '</button>').join('') + '</div></div>'
       + '<div class="barra"><span style="flex:1"></span>' + (s.guardando ? '<span class="sub" id="segProg">' + esc(typeof s.guardando === 'string' ? s.guardando : 'Guardando…') + '</span>' : '')
-      + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(clave) + '"' + dis + '>' + (multi ? 'Actualizar las ' + sels.length : 'Actualizar') + '</button></div></div>';
+      + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(clave) + '"' + dis + '>' + (multi ? 'Actualizar las ' + sels.length : 'Actualizar') + '</button></div></div>');
     // Ficha de detalle (la misma con una o varias elegidas). Con varias: el título dice cuántas; operario, tipo, fecha y estado
     // se muestran si coinciden en todas («Varios», «Varias» si no); los adjuntos de todas, en el mismo carrusel; todas en el mapa.
     const uno = f => { const v = new Set(sels.map(f)); return v.size === 1 ? f(sel) : null; };
@@ -310,12 +312,12 @@
         : '<div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
         + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '')) + '</div>'
       // Adjuntos en carrusel (una fila que se desliza, con ‹ › si no caben), encima del mapa
-      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos' + (todosAdj.length ? ' <span class="chip c-gr num">' + todosAdj.length + '</span>' : '') + '</h2>'
-      + (todosAdj.length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + todosAdj.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
-      + (sels.some(i => i.lat != null) ? '<div><div id="mapa" class="mapa mini" aria-label="' + (multi ? 'Ubicación de las incidencias seleccionadas' : 'Ubicación de la incidencia') + '"></div>'
+      + plegable('adj', 'Adjuntos' + (todosAdj.length ? ' <span class="chip c-gr num">' + todosAdj.length + '</span>' : ''),
+        todosAdj.length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + todosAdj.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>')
+      + plegable('mapa', 'Mapa', sels.some(i => i.lat != null) ? '<div id="mapa" class="mapa mini" aria-label="' + (multi ? 'Ubicación de las incidencias seleccionadas' : 'Ubicación de la incidencia') + '"></div>'
         // Leyenda bajo el mapa: color de cada tipo del listado y qué indica el borde del triángulo
         + '<div class="leyenda">' + Array.from(new Set(l.map(i => i.tipo))).sort((a, b) => a.localeCompare(b, 'es')).map(t => '<span>' + triSvg(G.colorTipo(t), '#fff', 14) + esc(t) + '</span>').join('')
-        + '<span class="bordes">' + triSvg('#e4e7dd', '#fff', 14) + 'Pendiente ' + triSvg('#e4e7dd', '#111', 14) + 'Resuelta</span></div></div>' : '<span class="sub">Sin posición GPS.</span>')
+        + '<span class="bordes">' + triSvg('#e4e7dd', '#fff', 14) + 'Pendiente ' + triSvg('#e4e7dd', '#111', 14) + 'Resuelta</span></div>' : '<span class="sub">Sin posición GPS.</span>')
       + seguimiento + '</div>';
     return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
@@ -335,6 +337,7 @@
     if (!el || !sel) return;
     const enSel = new Set(sels.map(i => i.id));
     G.destruirMapa();
+    if (el.closest("details:not([open])")) return; // Sección «Mapa» plegada: se pinta al desplegarla
     const m = L.map(el, { scrollWheelZoom: false }); mapaActual = m;
     const fondos = crearFondos();
     let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
