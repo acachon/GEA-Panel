@@ -253,7 +253,7 @@
     const ficha = cuerpo => '<div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lcab">'
       + (l.length > 1 ? '<input type="checkbox" class="selc" id="chkTodas" title="Seleccionar todas" aria-label="Seleccionar todas las incidencias"' + (todas ? ' checked' : '') + ' data-ind="' + (multi && !todas ? 1 : 0) + '">' : '')
       + '<h2>Listado Incidencias</h2><span class="chip c-gr num" aria-label="' + l.length + ' incidencias">' + l.length + '</span><span style="flex:1"></span>'
-      + '<button type="button" class="ico" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Exportar a Excel" aria-label="Exportar a Excel">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
+      + '<button type="button" class="ico" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="' + (sels.length > 1 ? 'Exportar a Excel las ' + sels.length + ' incidencias seleccionadas' : 'Exportar a Excel la incidencia seleccionada') + ', con su seguimiento" aria-label="Exportar a Excel las incidencias seleccionadas">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
     if (!l.length) return barra + msg + '<div class="fila">' + ficha(vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.')) + '</div>';
 
     // El tipo ocupa siempre el mismo ancho: si el nombre es largo se recorta con «…» (completo al pasar el ratón)
@@ -391,17 +391,20 @@
     else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && visor.lista.length > 1) { visor.k = (visor.k + (e.key === 'ArrowRight' ? 1 : -1) + visor.lista.length) % visor.lista.length; pintarVisor(); }
   });
 
-  // Exporta las incidencias filtradas a CSV (separado por «;» y con coma decimal: lo abre Excel en español tal cual)
+  // Exportar a Excel (CSV): solo las incidencias seleccionadas en el listado, en su orden, con todo su seguimiento
+  // (cada apunte «[DD/MM/AAAA] [Usuario] comentario» en una línea de la misma celda, tal como se guarda en el Registro central)
   G.exportarInc = () => {
-    const l = G.incFiltradas(), p = G.periodo();
+    const todas = G.incFiltradas(), l = G.incSeleccionadas(), p = G.periodo();
     const cel = v => { let t = String(v == null ? '' : v); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     const dec = n => n == null ? '' : String(n).replace('.', ',');
-    const cab = ['Fecha', 'Hora', 'Empleado', 'Tipo', 'Comentario', 'Estado', 'Nota supervisor', 'Latitud', 'Longitud', 'Precisión (m)', 'Ver en mapa', 'Adjuntos', 'Enlaces adjuntos'];
-    const filas = l.map(i => [i.dia.split('-').reverse().join('/'), G.hhmm(i.t), i.nombre, i.tipo, i.comentario, i.estado, i.nota, dec(i.lat), dec(i.lon), dec(i.precision),
+    const apuntes = i => String(i.nota || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const cambio = i => i.fechaEstado && !isNaN(new Date(i.fechaEstado)) ? G.dayKey(new Date(i.fechaEstado)).split('-').reverse().join('/') + ' ' + G.hhmm(new Date(i.fechaEstado).getTime()) : '';
+    const cab = ['Nº', 'Fecha', 'Hora', 'Empleado', 'Tipo', 'Comentario', 'Estado', 'Último cambio de seguimiento', 'Nº apuntes de seguimiento', 'Seguimiento', 'Latitud', 'Longitud', 'Precisión (m)', 'Ver en mapa', 'Adjuntos', 'Enlaces adjuntos'];
+    const filas = l.map(i => [todas.indexOf(i) + 1, i.dia.split('-').reverse().join('/'), G.hhmm(i.t), i.nombre, i.tipo, i.comentario, i.estado, cambio(i), apuntes(i).length, apuntes(i).join('\n'), dec(i.lat), dec(i.lon), dec(i.precision),
       i.lat != null ? 'https://maps.google.com/?q=' + i.lat + ',' + i.lon : '', (i.adjuntos || []).map(a => a.nombre).join('\n'), (i.adjuntos || []).map(a => G.urlSegura(a.url)).filter(Boolean).join('\n')]);
     const txt = '﻿' + [cab].concat(filas).map(f => f.map(cel).join(';')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' }));
-    a.download = 'incidencias_' + p[0] + (p.length > 1 ? '_' + p[p.length - 1] : '') + '.csv';
+    a.download = 'incidencias_' + p[0] + (p.length > 1 ? '_' + p[p.length - 1] : '') + (l.length === 1 ? '_' + l[0].nombre.replace(/[^\wÀ-ÿ-]+/g, '-') + '_' + G.hhmm(l[0].t).replace(':', 'h') : '_' + l.length + '-seleccionadas') + '.csv';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
