@@ -219,30 +219,34 @@
   const normal = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   // Adjuntos que se pueden abrir (con enlace de Google Drive)
   const adjVisibles = i => (i.adjuntos || []).filter(a => G.urlSegura(a.url));
-  // Incidencias que pasan los filtros de la pantalla: empleado, tipo, estado y texto buscado
+  // Incidencias que pasan los filtros de la pantalla (tipo, estado y texto buscado), en el orden elegido
+  const ORDENES = { fecha: 'Fecha', operario: 'Operario', tipo: 'Tipo de incidencia', estado: 'Estado' };
   G.incFiltradas = () => {
-    const s = S(), q = normal(s.q).trim();
-    return s.data.inc.filter(i => (!s.emp || i.nombre === s.emp) && (!s.tipo || i.tipo === s.tipo) && (!s.est || i.estado === s.est)
+    const s = S(), q = normal(s.q).trim(), es = (a, b) => String(a || '').localeCompare(String(b || ''), 'es');
+    const l = s.data.inc.filter(i => (!s.tipo || i.tipo === s.tipo) && (!s.est || i.estado === s.est)
       && (!q || normal([i.comentario, i.tipo, i.nombre, i.nota].join(' ')).includes(q)));
+    // Dentro de cada grupo, la más reciente primero (los datos ya vienen así)
+    const cmp = { operario: (a, b) => es(a.nombre, b.nombre), tipo: (a, b) => es(a.tipo, b.tipo), estado: (a, b) => (a.estado === 'Resuelta') - (b.estado === 'Resuelta') }[s.orden];
+    return cmp ? l.sort((a, b) => cmp(a, b) || b.t - a.t) : l;
   };
   G.incSeleccionada = () => { const l = G.incFiltradas(); return l.find(i => i.id === S().incSel) || l[0]; };
+  const ICO_EXP = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/></svg>';
 
   function incidencias() {
-    const s = S(), D = s.data, p = G.periodo(), hoy = G.dayKey(new Date());
+    const s = S(), D = s.data;
     const tipos = Array.from(new Set(D.inc.map(i => i.tipo))).sort((a, b) => a.localeCompare(b, 'es'));
     const l = G.incFiltradas(), sel = G.incSeleccionada();
-    const pend = D.inc.filter(i => (!s.emp || i.nombre === s.emp) && i.estado !== 'Resuelta').length;
     const op = (v, t, a) => '<option value="' + esc(v) + '"' + (v === a ? ' selected' : '') + '>' + esc(t) + '</option>';
     const msg = s.incMsg ? '<div class="aviso ' + (s.incMsg.ok ? 'ok' : 'err') + '" role="status">' + esc(s.incMsg.t) + '</div>' : '';
     const barra = '<div class="barra">'
-      + '<label class="campo"><span>Desde</span><input type="date" id="fDesde" max="' + hoy + '" value="' + p[0] + '"></label>'
-      + '<label class="campo"><span>Hasta</span><input type="date" id="fHasta" max="' + hoy + '" value="' + p[p.length - 1] + '"></label>'
+      + '<label class="campo"><span>Ordenar por</span><select id="fOrden">' + Object.keys(ORDENES).map(k => op(k, ORDENES[k], s.orden)).join('') + '</select></label>'
       + '<label class="campo"><span>Estado</span><select id="fEst">' + op('', 'Todas', s.est) + op('Pendiente', 'Pendientes', s.est) + op('Resuelta', 'Resueltas', s.est) + '</select></label>'
       + '<label class="campo"><span>Tipo</span><select id="fTipo">' + op('', 'Todos', s.tipo) + tipos.map(t => op(t, t, s.tipo)).join('') + '</select></label>'
-      + '<label class="campo buscar"><span>Buscar</span><input type="search" id="fBuscar" placeholder="Comentario, empleado, nota…" value="' + esc(s.q) + '"></label>'
-      + '<span class="chip c-gr">' + l.length + (l.length === 1 ? ' incidencia' : ' incidencias') + '</span>' + (pend ? '<span class="chip c-av">' + pend + (pend === 1 ? ' pendiente' : ' pendientes') + '</span>' : '')
-      + '<span style="flex:1"></span><button class="btn" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Descarga las incidencias filtradas en un archivo que abre Excel">Exportar a Excel (CSV)</button></div>';
-    if (!l.length) return barra + msg + vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.');
+      + '<label class="campo buscar"><span>Buscar</span><input type="search" id="fBuscar" placeholder="Comentario, operario, nota…" value="' + esc(s.q) + '"></label></div>';
+    // Ficha del listado: título, contador y, a la derecha, el icono para exportar a Excel
+    const ficha = cuerpo => '<div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lcab"><h2>Listado Incidencias</h2><span class="chip c-gr num" aria-label="' + l.length + ' incidencias">' + l.length + '</span><span style="flex:1"></span>'
+      + '<button type="button" class="ico" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Exportar a Excel" aria-label="Exportar a Excel">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
+    if (!l.length) return barra + msg + '<div class="fila">' + ficha(vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.')) + '</div>';
 
     const item = i => '<div class="it clic' + (i.id === sel.id ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><span class="chip c-gr">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
       + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
@@ -266,7 +270,7 @@
       + '<div class="barra">' + (res ? '<button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Volver a pendiente</button><button class="btn" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>'
         : '<button class="btn pri" data-estado="Resuelta" data-id="' + esc(sel.id) + '"' + dis + '>Marcar como resuelta</button><button class="btn" data-estado="Pendiente" data-id="' + esc(sel.id) + '"' + dis + '>Guardar nota</button>')
       + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '</div></div></div>';
-    return barra + msg + '<div class="fila"><div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lista larga">' + l.map(item).join('') + '</div></div>' + detalle + '</div>';
+    return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
 
   // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
@@ -328,7 +332,7 @@
     const cel = v => { let t = String(v == null ? '' : v); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     const dec = n => n == null ? '' : String(n).replace('.', ',');
     const cab = ['Fecha', 'Hora', 'Empleado', 'Tipo', 'Comentario', 'Estado', 'Nota supervisor', 'Latitud', 'Longitud', 'Precisión (m)', 'Ver en mapa', 'Adjuntos', 'Enlaces adjuntos'];
-    const filas = l.slice().reverse().map(i => [i.dia.split('-').reverse().join('/'), G.hhmm(i.t), i.nombre, i.tipo, i.comentario, i.estado, i.nota, dec(i.lat), dec(i.lon), dec(i.precision),
+    const filas = l.map(i => [i.dia.split('-').reverse().join('/'), G.hhmm(i.t), i.nombre, i.tipo, i.comentario, i.estado, i.nota, dec(i.lat), dec(i.lon), dec(i.precision),
       i.lat != null ? 'https://maps.google.com/?q=' + i.lat + ',' + i.lon : '', (i.adjuntos || []).map(a => a.nombre).join('\n'), (i.adjuntos || []).map(a => G.urlSegura(a.url)).filter(Boolean).join('\n')]);
     const txt = '﻿' + [cab].concat(filas).map(f => f.map(cel).join(';')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' }));

@@ -6,12 +6,12 @@
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
-  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', desde: '', hasta: '', incSel: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
-  const MAX_DIAS = 92; // rango máximo (Desde / Hasta de Incidencias)
+  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSel: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
+  const MAX_DIAS = 92; // días que se pueden elegir a la vez en el calendario
   const ultimos = n => { const h = hoy(); return Array.from({ length: n }, (_, i) => G.addDays(h, i - n + 1)); };
   G.periodo = () => {
     const h = hoy();
-    if (S.modo === 'rango') { const l = []; for (let d = S.desde; d <= S.hasta && l.length < MAX_DIAS; d = G.addDays(d, 1)) l.push(d); return l.length ? l : [h]; }
+    if (S.modo === 'dias') return S.dias.length ? S.dias.slice() : [h];
     return S.modo === 'hoy' ? [h] : S.modo === 'ayer' ? [G.addDays(h, -1)] : S.modo === '7d' ? ultimos(7) : S.modo === '30d' ? ultimos(30) : [S.dia];
   };
   const conectado = () => S.cfg.demo || (S.cfg.url && S.cfg.clave);
@@ -28,16 +28,62 @@
     if (S.vista === 'config') return '<div class="cab"><div><span class="lbl">Finca El Caimbo</span><h1>' + v.t + '</h1></div></div>';
     const p = G.periodo(), D = S.data, filtroLab = S.vista !== 'incidencias' && S.vista !== 'personal' ? '' : '';
     const seg = (m, t) => '<button data-modo="' + m + '" class="' + (S.modo === m ? 'on' : '') + '">' + t + '</button>';
-    const fecha = p.length === 1 ? G.diaLargo(p[0]) : G.diaCorto(p[0]) + ' – ' + G.diaCorto(p[p.length - 1]);
+    const seguidos = p.every((d, i) => !i || G.addDays(p[i - 1], 1) === d);
+    const fecha = p.length === 1 ? G.diaLargo(p[0]) : seguidos ? G.diaCorto(p[0]) + ' – ' + G.diaCorto(p[p.length - 1]) : p.length + ' días elegidos';
+    const ddmm = k => k.split('-').reverse().slice(0, 2).join('/');
+    const txtDias = p.length === 1 ? p[0].split('-').reverse().join('/') : seguidos ? ddmm(p[0]) + ' – ' + ddmm(p[p.length - 1]) : p.length + ' días';
     const opts = (lista, sel, vacio) => '<option value="">' + vacio + '</option>' + lista.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === sel ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
     return '<div class="cab"><div><span class="lbl">Finca El Caimbo · ' + fecha + '</span><h1>' + v.t + '</h1><div class="barra" style="margin-top:6px">'
       + (S.actualizado ? '<span class="sub">Actualizado ' + G.hhmm(S.actualizado) + '</span>' : '')
       + (S.cfg.demo ? '<span class="chip c-av">Datos de ejemplo</span>' : D && D.hayPrueba ? '<span class="chip c-av">Incluye datos de prueba</span>' : '')
       + '</div></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
-      + '<label class="campo"><span>Día</span><input type="date" id="fDia" max="' + hoy() + '" value="' + (p.length === 1 ? p[0] : '') + '"></label>'
-      + (D ? '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>'
+      + '<div class="calw"><button type="button" class="campo" id="bCal" aria-haspopup="dialog" aria-expanded="' + !!S.cal + '" title="Elegir uno o varios días"><span>Días</span><b>' + txtDias + '</b>' + ICO_CAL + '</button>' + (S.cal ? htmlCal() : '') + '</div>'
+      + (D ? (S.vista === 'incidencias' ? '' : '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>')
         + (S.vista === 'resumen' || S.vista === 'mapa' || S.vista === 'labores' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
       + '<button class="btn pri" id="bAct"' + (S.cargando ? ' disabled' : '') + '>' + (S.cargando ? 'Cargando…' : 'Actualizar') + '</button></div></div>' + filtroLab;
+  }
+
+  /* Calendario de la cabecera: se pueden marcar varios días (con Mayús, todos los de un tramo) y «Aplicar» los carga */
+  const ICO_CAL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+  function htmlCal() {
+    const c = S.cal, [y, m] = c.mes.split('-').map(Number), h = hoy(), n = new Date(y, m, 0).getDate(), hueco = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+    const nombre = new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    let celdas = '<span></span>'.repeat(hueco);
+    for (let d = 1; d <= n; d++) {
+      const k = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      celdas += '<button type="button" data-cald="' + k + '" class="' + (c.sel.has(k) ? 'on' : '') + (k === h ? ' hoy' : '') + '"' + (k > h ? ' disabled' : '') + ' aria-pressed="' + c.sel.has(k) + '">' + d + '</button>';
+    }
+    return '<div class="cal" role="dialog" aria-label="Elegir días"><div class="calcab"><button type="button" data-calm="-1" aria-label="Mes anterior">‹</button><b>' + nombre + '</b><button type="button" data-calm="1" aria-label="Mes siguiente"' + (c.mes >= h.slice(0, 7) ? ' disabled' : '') + '>›</button></div>'
+      + '<div class="calsem"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div><div class="caldias">' + celdas + '</div>'
+      + '<div class="sub">Pulsa los días que quieras ver. Con Mayús pulsada se marcan todos los días de un tramo.</div>'
+      + '<div class="barra"><b class="sub">' + c.sel.size + (c.sel.size === 1 ? ' día' : ' días') + '</b><span style="flex:1"></span><button type="button" class="btn" data-calx="limpiar">Limpiar</button><button type="button" class="btn pri" data-calx="aplicar"' + (c.sel.size ? '' : ' disabled') + '>Aplicar</button></div></div>';
+  }
+  // Repinta solo el calendario (sin volver a dibujar la pantalla ni el mapa)
+  function pintarCal() {
+    const w = $('.calw'); if (!w) return;
+    const viejo = w.querySelector('.cal'); if (viejo) viejo.remove();
+    if (S.cal) w.insertAdjacentHTML('beforeend', htmlCal());
+    $('#bCal').setAttribute('aria-expanded', !!S.cal);
+  }
+  function clicCal(t, e) {
+    const c = S.cal;
+    if (t.id === 'bCal') { const p = G.periodo(); S.cal = c ? null : { mes: p[p.length - 1].slice(0, 7), sel: new Set(p), ult: null }; }
+    else if (t.dataset.cald) {
+      const k = t.dataset.cald;
+      if (e.shiftKey && c.ult) { const [a, b] = c.ult < k ? [c.ult, k] : [k, c.ult]; for (let d = a; d <= b; d = G.addDays(d, 1)) c.sel.add(d); }
+      else if (c.sel.has(k)) c.sel.delete(k); else c.sel.add(k);
+      c.ult = k;
+    }
+    else if (t.dataset.calm) { const [y, m] = c.mes.split('-').map(Number), d = new Date(y, m - 1 + Number(t.dataset.calm), 1); c.mes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+    else if (t.dataset.calx === 'limpiar') c.sel.clear();
+    else if (t.dataset.calx === 'aplicar') {
+      let dias = Array.from(c.sel).sort();
+      if (dias.length > MAX_DIAS) { dias = dias.slice(-MAX_DIAS); alert('Como mucho se ven ' + MAX_DIAS + ' días a la vez: se cargan los ' + MAX_DIAS + ' más recientes.'); }
+      S.cal = null; S.incMsg = null;
+      if (dias.length === 1) { S.modo = 'dia'; S.dia = dias[0]; } else { S.modo = 'dias'; S.dias = dias; }
+      cargar(false); return;
+    }
+    pintarCal();
   }
 
   function render() {
@@ -75,6 +121,9 @@
   window.addEventListener('hashchange', ruta);
 
   document.addEventListener('click', e => {
+    const tc = e.target.closest('#bCal,[data-cald],[data-calm],[data-calx]');
+    if (tc) { clicCal(tc, e); return; }
+    if (S.cal && !e.target.closest('.cal')) { S.cal = null; pintarCal(); }
     const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-estado],[data-adj],#bAct,#bProbar,#bCsv'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
     else if (t.dataset.inc) { S.incSel = t.dataset.inc; S.incMsg = null; render(); }
@@ -88,17 +137,11 @@
   });
   document.addEventListener('change', e => {
     const t = e.target;
-    if (t.id === 'fDia') { if (t.value) { S.dia = t.value; S.modo = 'dia'; cargar(false); } }
-    else if (t.id === 'fEmp') { S.emp = t.value; render(); }
+    if (t.id === 'fEmp') { S.emp = t.value; render(); }
     else if (t.id === 'fLab') { S.lab = t.value; render(); }
     else if (t.id === 'fTipo') { S.tipo = t.value; S.incMsg = null; render(); }
     else if (t.id === 'fEst') { S.est = t.value; S.incMsg = null; render(); }
-    else if (t.id === 'fDesde' || t.id === 'fHasta') {
-      const p = G.periodo(); let d = $('#fDesde').value || p[0], h = $('#fHasta').value || p[p.length - 1];
-      if (d > h) [d, h] = [h, d];
-      if (G.addDays(d, MAX_DIAS - 1) < h) { d = G.addDays(h, -(MAX_DIAS - 1)); alert('Como mucho se ven ' + MAX_DIAS + ' días seguidos: el periodo empieza el ' + G.diaLargo(d) + '.'); }
-      S.desde = d; S.hasta = h; S.modo = d === h ? 'dia' : 'rango'; S.dia = d; S.incMsg = null; cargar(false);
-    }
+    else if (t.id === 'fOrden') { S.orden = t.value; render(); }
     else if (t.dataset && t.dataset.capa) { G.capas[t.dataset.capa] = t.checked; G.repintarMapa(); }
   });
   // Buscar en Incidencias: filtra mientras se escribe sin perder el cursor; la nota se guarda como borrador
@@ -127,8 +170,10 @@
     catch (err) { est.textContent = 'No funciona: ' + (err.message || err); }
   }
 
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.cal) { S.cal = null; pintarCal(); $('#bCal').focus(); } });
+
   // Refresco automático cada 2 minutos mientras se mira el día en curso
-  // (no mientras se escribe una nota o una búsqueda, ni con el visor de adjuntos abierto)
-  setInterval(() => { if (!document.hidden && S.vista !== 'config' && !S.guardando && !document.querySelector('.visor') && !(document.activeElement && /^(incNota|fBuscar)$/.test(document.activeElement.id)) && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
+  // (no mientras se escribe una nota o una búsqueda, ni con el visor de adjuntos o el calendario abiertos)
+  setInterval(() => { if (!document.hidden && S.vista !== 'config' && !S.guardando && !S.cal && !document.querySelector('.visor') && !(document.activeElement && /^(incNota|fBuscar)$/.test(document.activeElement.id)) && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
   ruta(); cargar(false);
 })();
