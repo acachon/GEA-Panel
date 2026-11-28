@@ -233,6 +233,7 @@
   // Selección (una o varias filas): las elegidas que siguen visibles con los filtros, en el orden del listado; si no hay ninguna, la primera
   G.incSeleccionadas = () => { const l = G.incFiltradas(), q = S().incSels || []; const v = l.filter(i => q.includes(i.id)); return v.length ? v : l.slice(0, 1); };
   G.incSeleccionada = () => G.incSeleccionadas()[0];
+  G.adjsSeleccion = () => G.incSeleccionadas().flatMap(adjVisibles);
   const ICO_EXP = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/></svg>';
 
   function incidencias() {
@@ -260,13 +261,15 @@
     // Casilla de cada fila: suma o quita esa incidencia de la selección (también Ctrl+clic; Mayús+clic elige un tramo)
     const item = (i, k) => '<div class="it clic' + (enSel.has(i.id) ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><input type="checkbox" class="selc" aria-label="Seleccionar la incidencia ' + (k + 1) + '"' + (enSel.has(i.id) ? ' checked' : '') + '><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Número ' + (k + 1) + ' en el mapa">' + (k + 1) + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
       + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
-    // Adjuntos: miniatura de las fotos (si Drive la da) e icono para vídeos y audios; al pulsar se abren en el visor
-    const va = adjVisibles(sel);
-    const tesela = a => {
+    // Adjuntos de la selección (de todas si hay varias): miniatura de las fotos (si Drive la da) e icono para vídeos y audios;
+    // con varias, delante del icono va el número de su incidencia en el listado. Al pulsar se abren en el visor.
+    const va = G.adjsSeleccion(), todosAdj = sels.flatMap(i => (i.adjuntos || []).map(a => ({ a, i, n: l.indexOf(i) + 1 })));
+    const tesela = ({ a, i, n }) => {
       const k = va.indexOf(a), t = TIPO_ADJ[a.tipo] || 'Archivo', id = G.driveId(a.url);
       const img = a.tipo === 'foto' && id ? '<img alt="" loading="lazy" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&amp;sz=w400" onerror="this.remove()">' : '';
-      return k < 0 ? '<span class="adj sin" title="Este adjunto aún no tiene enlace en Drive">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + '<span>' + t + ' (sin enlace)</span></span>'
-        : '<button type="button" class="adj" data-adj="' + k + '" title="Ver ' + esc(a.nombre) + '">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + img + '<span>' + t + '</span></button>';
+      const nro = multi ? '<span class="adjn num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Incidencia ' + n + '">' + n + '</span>' : '';
+      return k < 0 ? '<span class="adj sin" title="Este adjunto aún no tiene enlace en Drive">' + nro + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + '<span>' + t + ' (sin enlace)</span></span>'
+        : '<button type="button" class="adj" data-adj="' + k + '" title="Ver ' + esc(a.nombre) + (multi ? ' (incidencia ' + n + ')' : '') + '">' + nro + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + img + '<span>' + t + '</span></button>';
     };
     // Seguimiento: historial «[DD/MM/AAAA] [Usuario] comentario» (una línea por comentario guardado), comentario nuevo y estado
     // Con varias elegidas, el comentario se añade a cada una y el estado elegido pasa a ser el de todas («Sin cambiar» si no coinciden)
@@ -286,22 +289,24 @@
       + ['Pendiente', 'Resuelta'].map(v => '<button type="button" class="estb ' + (v === 'Resuelta' ? 'r' : 'p') + (borr.est === v ? ' on' : '') + '" data-est="' + v + '" aria-pressed="' + (borr.est === v) + '"' + dis + '>' + v + '</button>').join('') + '</div></div>'
       + '<div class="barra"><span style="flex:1"></span>' + (s.guardando ? '<span class="sub" id="segProg">' + esc(typeof s.guardando === 'string' ? s.guardando : 'Guardando…') + '</span>' : '')
       + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(clave) + '"' + dis + '>' + (multi ? 'Actualizar las ' + sels.length : 'Actualizar') + '</button></div></div>';
+    // Ficha de detalle (la misma con una o varias elegidas). Con varias: el título dice cuántas; operario, tipo, fecha y estado
+    // se muestran si coinciden en todas («Varios», «Varias» si no); los adjuntos de todas, en el mismo carrusel; todas en el mapa.
+    const uno = f => { const v = new Set(sels.map(f)); return v.size === 1 ? f(sel) : null; };
+    const tipoC = uno(i => i.tipo), nombreC = uno(i => i.nombre), diaC = uno(i => i.dia), estC = uno(i => i.estado);
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
-      + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
-      + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '') + '</div>'
+      + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(tipoC || 'Varios tipos') + '</span>' + (estC ? chipEst(estC) : '')
+      + (multi ? '<span style="flex:1"></span><button type="button" class="btn" id="bQuitarSel">Quitar selección</button>' : '') + '</div>'
+      + '<h2 style="font-size:20px;margin-top:6px">' + (multi ? sels.length + ' incidencias seleccionadas' : esc(sel.comentario || 'Sin comentario')) + '</h2></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(nombreC || 'Varios') + '</b></div>'
+      + (multi ? '<div><span class="sub">Fecha</span><br><b class="num">' + (diaC ? G.diaCorto(diaC) : 'Varias') + '</b></div>'
+        : '<div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
+        + (sel.fechaEstado && !isNaN(new Date(sel.fechaEstado)) ? '<div><span class="sub">' + (res ? 'Resuelta' : 'Último cambio') + '</span><br><b class="num">' + G.diaCorto(G.dayKey(new Date(sel.fechaEstado))) + ' · ' + G.hhmm(new Date(sel.fechaEstado).getTime()) + '</b></div>' : '')) + '</div>'
       // Adjuntos en carrusel (una fila que se desliza, con ‹ › si no caben), encima del mapa
-      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos' + ((sel.adjuntos || []).length ? ' <span class="chip c-gr num">' + sel.adjuntos.length + '</span>' : '') + '</h2>'
-      + ((sel.adjuntos || []).length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
-      + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div>' : '<span class="sub">Sin posición GPS.</span>')
+      + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos' + (todosAdj.length ? ' <span class="chip c-gr num">' + todosAdj.length + '</span>' : '') + '</h2>'
+      + (todosAdj.length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + todosAdj.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
+      + (sels.some(i => i.lat != null) ? '<div id="mapa" class="mapa mini" aria-label="' + (multi ? 'Ubicación de las incidencias seleccionadas' : 'Ubicación de la incidencia') + '"></div>' : '<span class="sub">Sin posición GPS.</span>')
       + seguimiento + '</div>';
-    // Varias elegidas: resumen de cada una (al pulsarla se queda solo esa), todas en el mapa y un seguimiento común
-    const detalleMulti = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
-      + '<div class="barra" style="gap:8px"><h2 style="font-size:20px">' + sels.length + ' incidencias seleccionadas</h2><span style="flex:1"></span><button type="button" class="btn" id="bQuitarSel">Quitar selección</button></div>'
-      + '<div class="selchips">' + sels.map(i => { const k = l.indexOf(i) + 1; return '<button type="button" class="selchip" data-inc="' + esc(i.id) + '" title="Ver solo esta"><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '">' + k + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><span class="scn">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</span>' + chipEst(i.estado) + '</button>'; }).join('') + '</div>'
-      + (sels.some(i => i.lat != null) ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de las incidencias seleccionadas"></div>' : '<span class="sub">Ninguna tiene posición GPS.</span>')
-      + seguimiento + '</div>';
-    return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + (multi ? detalleMulti : detalle) + '</div>';
+    return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
 
   // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
@@ -366,8 +371,7 @@
       : '<div class="vacio" style="color:#fff">No se puede mostrar aquí. Usa «Abrir en Drive».</div>';
   }
   G.abrirVisor = k => {
-    const sel = G.incSeleccionada(); if (!sel) return;
-    const lista = adjVisibles(sel); if (!lista[k]) return;
+    const lista = G.adjsSeleccion(); if (!lista[k]) return;
     cerrarVisor();
     const el = document.createElement('div'); el.className = 'visor'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Adjuntos de la incidencia');
     el.innerHTML = '<div class="vcab"><span class="vt"></span><a class="btn vdrive" target="_blank" rel="noopener">Abrir en Drive</a><button type="button" class="btn vx" aria-label="Cerrar">✕</button></div>'
