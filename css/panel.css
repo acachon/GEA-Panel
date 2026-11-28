@@ -87,9 +87,8 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 .vistamapa button{border:0;background:#fff;color:#1f2617;font:600 .78rem var(--display,inherit);padding:7px 10px;min-height:0;border-radius:0;cursor:pointer}
 .vistamapa button+button{border-left:1px solid #d8d4c4}
 .vistamapa button[aria-pressed=true]{background:#0f4d2a;color:#fff}
-/* Marca: logotipo de GEA (kit de marca) en versión para fondo oscuro; menú en «Petróleo» con acento «Menta» */
-:root{--petroleo:#0B2B30;--geo:#13A38A;--menta:#7FD8C3;--senal:#FF7A45}
-#nav{background:var(--petroleo)}
-#nav .marca{padding:0 10px 4px}
-#nav .marca img{display:block;width:150px;height:auto}
-#nav a.item.on{box-shadow:inset 3px 0 0 var(--menta)}
+/* Marca: logo de GEA (el mismo que la app) sobre una ficha clara + «gea» */
+#nav .marca{display:flex;align-items:center;gap:10px;padding:0 10px}
+#nav .marca .ficha{flex:none;width:44px;height:44px;border-radius:12px;background:var(--fondo);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+#nav .marca .pin{width:30px;height:36px}
+#nav .marca .logo{padding:0;line-height:1}
