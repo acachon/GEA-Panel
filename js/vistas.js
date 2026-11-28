@@ -294,8 +294,7 @@
     const uno = f => { const v = new Set(sels.map(f)); return v.size === 1 ? f(sel) : null; };
     const tipoC = uno(i => i.tipo), nombreC = uno(i => i.nombre), diaC = uno(i => i.dia), estC = uno(i => i.estado);
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
-      + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(tipoC || 'Varios tipos') + '</span>' + (estC ? chipEst(estC) : '')
-      + (multi ? '<span style="flex:1"></span><button type="button" class="btn" id="bQuitarSel">Quitar selección</button>' : '') + '</div>'
+      + '<div>' + (tipoC || estC ? '<div class="barra" style="gap:8px">' + (tipoC ? '<span class="lbl">' + esc(tipoC) + '</span>' : '') + (estC ? chipEst(estC) : '') + '</div>' : '')
       // Título y, a su derecha, el botón para abrir la ubicación en Google Maps (solo con una incidencia con GPS)
       + '<div style="display:flex;align-items:flex-start;gap:10px;margin-top:6px"><h2 style="font-size:20px;flex:1;min-width:0">' + (multi ? sels.length + ' incidencias seleccionadas' : esc(sel.comentario || 'Sin comentario')) + '</h2>'
       + (!multi && sel.lat != null ? '<a class="ico gmaps" href="https://maps.google.com/?q=' + encodeURIComponent(sel.lat + ',' + sel.lon) + '" target="_blank" rel="noopener" title="Abrir en Google Maps" aria-label="Abrir en Google Maps">' + ICO_GMAPS + '</a>' : '') + '</div></div>'
@@ -306,17 +305,22 @@
       // Adjuntos en carrusel (una fila que se desliza, con ‹ › si no caben), encima del mapa
       + '<div><h2 style="font-size:14px;margin-bottom:8px">Adjuntos' + (todosAdj.length ? ' <span class="chip c-gr num">' + todosAdj.length + '</span>' : '') + '</h2>'
       + (todosAdj.length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + todosAdj.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
-      + (sels.some(i => i.lat != null) ? '<div id="mapa" class="mapa mini" aria-label="' + (multi ? 'Ubicación de las incidencias seleccionadas' : 'Ubicación de la incidencia') + '"></div>' : '<span class="sub">Sin posición GPS.</span>')
+      + (sels.some(i => i.lat != null) ? '<div><div id="mapa" class="mapa mini" aria-label="' + (multi ? 'Ubicación de las incidencias seleccionadas' : 'Ubicación de la incidencia') + '"></div>'
+        // Leyenda bajo el mapa: color de cada tipo del listado y qué indica el borde del triángulo
+        + '<div class="leyenda">' + Array.from(new Set(l.map(i => i.tipo))).sort((a, b) => a.localeCompare(b, 'es')).map(t => '<span>' + triSvg(G.colorTipo(t), '#fff', 14) + esc(t) + '</span>').join('')
+        + '<span class="bordes">' + triSvg('#e4e7dd', '#fff', 14) + 'Pendiente ' + triSvg('#e4e7dd', '#111', 14) + 'Resuelta</span></div></div>' : '<span class="sub">Sin posición GPS.</span>')
       + seguimiento + '</div>';
     return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
 
   // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
-  // Triángulo de la incidencia: color de su tipo y su número del listado (la elegida, más grande y con borde lima)
+  // Triángulo de la incidencia: color de su tipo, su número del listado y borde blanco si está pendiente o negro si está resuelta
+  // (las elegidas, más grandes y con un halo lima)
+  function triSvg(c, borde, w) { return '<svg width="' + w + '" height="' + Math.round(w * .92) + '" viewBox="0 0 30 28" aria-hidden="true"><path d="M15 2 L28.5 25.5 H1.5 Z" fill="' + c + '" stroke="' + borde + '" stroke-width="3" stroke-linejoin="round"/></svg>'; }
   const triangulo = (i, n, elegida) => {
     const w = elegida ? 40 : 30, h = Math.round(w * .92), c = G.colorTipo(i.tipo), fs = String(n).length > 2 ? 8 : String(n).length > 1 ? 10 : 12;
     return L.divIcon({ className: 'mk tri' + (elegida ? ' sel' : ''), iconSize: [w, h], iconAnchor: [w / 2, h - 2],
-      html: '<svg width="' + w + '" height="' + h + '" viewBox="0 0 30 28" aria-hidden="true"><path d="M15 2 L28.5 25.5 H1.5 Z" fill="' + c + '" stroke="' + (elegida ? '#a6cd3a' : '#fff') + '" stroke-width="' + (elegida ? 3 : 2) + '" stroke-linejoin="round"/><text x="15" y="22" text-anchor="middle" font-size="' + fs + '" font-weight="800" fill="#fff" font-family="Figtree,system-ui,sans-serif">' + n + '</text></svg>' });
+      html: '<svg width="' + w + '" height="' + h + '" viewBox="0 0 30 28" aria-hidden="true"><path d="M15 2 L28.5 25.5 H1.5 Z" fill="' + c + '" stroke="' + (i.estado === 'Resuelta' ? '#111' : '#fff') + '" stroke-width="' + (elegida ? 3 : 2.2) + '" stroke-linejoin="round"/><text x="15" y="22" text-anchor="middle" font-size="' + fs + '" font-weight="800" fill="#fff" font-family="Figtree,system-ui,sans-serif">' + n + '</text></svg>' });
   };
   const ICO_GMAPS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
   function miniMapa() {
