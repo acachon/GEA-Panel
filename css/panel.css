@@ -251,3 +251,29 @@ button.campo svg{color:var(--olivo)}
 .lista .tipoico img{width:36px;height:36px;display:block}
 .lista .tipoico b{max-width:100%;font-size:11px;line-height:1.15;font-weight:700;color:#1d4d2c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lista .it.res .tipoico{opacity:.75}
+/* ---------- Labores ---------- */
+/* Resumen de horas (plegable, encima del listado) */
+details.pleg.card{border-top:0;padding-top:16px;margin-bottom:16px}
+details.pleg.card > .plegc{margin-top:12px}
+h3.lbl{margin:0;font-size:11px}
+.barlab{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:1px solid transparent;border-radius:10px;padding:4px 6px;cursor:pointer}
+.barlab:hover{background:#f0f5e4}
+.barlab.on{background:#f0f5e4;border-color:var(--olivo)}
+.barlab img{flex:none;width:34px;height:34px}
+.barlab .bl{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.barlab .bn{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.t.calor td.clic{cursor:pointer}
+.t.calor td.clic:hover{outline:2px solid var(--lima);outline-offset:-2px}
+.t.calor td.on{outline:2px solid var(--olivo);outline-offset:-2px;font-weight:800}
+.tdlab{display:inline-flex;align-items:center;gap:8px}
+.tdlab img{width:26px;height:26px}
+/* Ficha de detalle */
+.icodet{flex:none;width:52px;height:52px}
+.datos{display:flex;flex-wrap:wrap;gap:10px 24px;font-size:14px}
+.leyenda .lin{display:inline-block;width:18px;height:5px;border-radius:3px}
+.pin{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);font-style:normal;font-size:9px;font-weight:800;color:#fff;vertical-align:-3px}
+.pin.ini{background:#2e9e3f}
+.pin.fin{background:#111;border-radius:3px}
+.leyenda .pin{width:12px;height:12px;border-width:1.5px}
+.t.calor td,.t.calor th{white-space:nowrap}
+@media (max-width:600px){.lista .it .chip.ha{display:none}}

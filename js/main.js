@@ -6,7 +6,7 @@
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
-  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSels: [], incAncla: null, plegadas: {}, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
+  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSels: [], incAncla: null, labSels: [], labAncla: null, lorden: 'fecha', lq: '', plegadas: {}, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
   const MAX_DIAS = 92; // días que se pueden elegir a la vez en el calendario
   const ultimos = n => { const h = hoy(); return Array.from({ length: n }, (_, i) => G.addDays(h, i - n + 1)); };
   G.periodo = () => {
@@ -35,8 +35,8 @@
     const opts = (lista, sel, vacio) => '<option value="">' + vacio + '</option>' + lista.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === sel ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('');
     return '<div class="cab"><div class="barra"><h1>' + v.t + '</h1></div><div class="barra"><div class="seg">' + seg('hoy', 'Hoy') + seg('ayer', 'Ayer') + seg('7d', '7 días') + seg('30d', '30 días') + '</div>'
       + '<div class="calw"><button type="button" class="campo" id="bCal" aria-haspopup="dialog" aria-expanded="' + !!S.cal + '" title="Elegir uno o varios días"><span>Días</span><b>' + txtDias + '</b>' + ICO_CAL + '</button>' + (S.cal ? htmlCal() : '') + '</div>'
-      + (D ? (S.vista === 'incidencias' ? '' : '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>')
-        + (S.vista === 'resumen' || S.vista === 'mapa' || S.vista === 'labores' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
+      + (D ? (S.vista === 'incidencias' || S.vista === 'labores' ? '' : '<label class="campo"><span>Empleado</span><select id="fEmp">' + opts(D.empleados.map(e => [e, e]), S.emp, 'Todos') + '</select></label>')
+        + (S.vista === 'resumen' || S.vista === 'mapa' ? '<label class="campo"><span>Labor</span><select id="fLab">' + opts(G.LABORES.filter(l => !l.pausa).map(l => [l.k, l.n]), S.lab, 'Todas') + '</select></label>' : '') : '')
       + '<button type="button" class="ico act' + (S.cargando ? ' gira' : '') + '" id="bAct"' + (S.cargando ? ' disabled' : '') + ' title="' + (S.cargando ? 'Cargando datos…' : 'Actualizar datos') + '" aria-label="' + (S.cargando ? 'Cargando datos' : 'Actualizar datos') + '">' + ICO_ACT + '</button></div></div>';
   }
   const ICO_ACT = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
@@ -112,25 +112,28 @@
     $('#vista').innerHTML = h;
     $('#main').classList.toggle('cargando', S.cargando && !!S.data);
     if (hayMapa && document.getElementById('mapa') && window.L) v.post();
-    const ct = $('#chkTodas'); if (ct) ct.indeterminate = ct.dataset.ind === '1';
+    ['#chkTodas', '#chkTodasL'].forEach(x => { const ct = $(x); if (ct) ct.indeterminate = ct.dataset.ind === '1'; });
     G.carrusel();
   }
 
   G.render = render;
 
   // Elegir incidencias en el listado o el mapa: clic = solo esa; sumar (casilla, Ctrl/Cmd) = añadir o quitar; tramo (Mayús) = desde la última pulsada
-  G.elegirInc = (id, sumar, tramo) => {
-    const l = G.incFiltradas().map(i => i.id), act = G.incSeleccionadas().map(i => i.id);
-    if (tramo && S.incAncla && l.includes(S.incAncla)) {
-      const a = l.indexOf(S.incAncla), b = l.indexOf(id);
-      S.incSels = Array.from(new Set(act.concat(l.slice(Math.min(a, b), Math.max(a, b) + 1))));
+  // (lo mismo para los registros de Labores, con su propia selección)
+  const elegir = (lista, elegidas, sels, ancla) => (id, sumar, tramo) => {
+    const l = lista().map(x => x.id), act = elegidas().map(x => x.id);
+    if (tramo && S[ancla] && l.includes(S[ancla])) {
+      const a = l.indexOf(S[ancla]), b = l.indexOf(id);
+      S[sels] = Array.from(new Set(act.concat(l.slice(Math.min(a, b), Math.max(a, b) + 1))));
     } else if (sumar) {
-      S.incSels = act.includes(id) ? act.filter(x => x !== id) : act.concat(id);
-      if (!S.incSels.length) S.incSels = [id];
-      S.incAncla = id;
-    } else { S.incSels = [id]; S.incAncla = id; }
+      S[sels] = act.includes(id) ? act.filter(x => x !== id) : act.concat(id);
+      if (!S[sels].length) S[sels] = [id];
+      S[ancla] = id;
+    } else { S[sels] = [id]; S[ancla] = id; }
     S.incMsg = null; render();
   };
+  G.elegirInc = elegir(() => G.incFiltradas(), () => G.incSeleccionadas(), 'incSels', 'incAncla');
+  G.elegirLab = elegir(() => G.labFiltradas(), () => G.labSeleccionadas(), 'labSels', 'labAncla');
 
   // Seguimiento («Actualizar») de una o varias incidencias: a cada una se le añade el comentario, firmado con fecha y usuario,
   // y el estado elegido pasa a ser el suyo. El servicio guarda una incidencia por llamada: se envían una tras otra.
@@ -173,7 +176,7 @@
     const tc = e.target.closest('#bCal,[data-cald],[data-calm],[data-calx]');
     if (tc) { clicCal(tc, e); return; }
     if (S.cal && !e.target.closest('.cal')) { S.cal = null; pintarCal(); }
-    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],[data-est],#bSeg,#bAct,#bProbar,#bCsv'); if (!t) return;
+    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],[data-est],[data-lab],[data-flab],[data-fcel],#bSeg,#bAct,#bProbar,#bCsv,#bCsvL'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
     else if (t.dataset.est) {
       // Botones de estado del seguimiento: el pulsado pasa a ser el elegido; si ya lo era, se cambia al otro (toggle)
@@ -186,6 +189,11 @@
     else if (t.dataset.adj) G.abrirVisor(Number(t.dataset.adj));
     else if (t.dataset.carr) G.carrusel(Number(t.dataset.carr));
     else if (t.id === 'bCsv') G.exportarInc();
+    else if (t.dataset.lab) G.elegirLab(t.dataset.lab, e.target.classList.contains('selc') || e.ctrlKey || e.metaKey, e.shiftKey);
+    // Resumen de horas de Labores: la barra filtra esa labor y la celda, ese operario en esa labor (otra pulsación quita el filtro)
+    else if (t.dataset.flab) { S.lab = S.lab === t.dataset.flab ? '' : t.dataset.flab; render(); }
+    else if (t.dataset.fcel) { const [emp, lab] = t.dataset.fcel.split('|'), igual = S.emp === emp && S.lab === lab; S.emp = igual ? '' : emp; S.lab = igual ? '' : lab; render(); }
+    else if (t.id === 'bCsvL') G.exportarLab();
     else if (t.dataset.ir) { S.emp = t.dataset.emp || ''; }
     else if (t.dataset.demo) { S.cfg.demo = true; guardarCfg(S.cfg); cargar(true); }
     else if (t.id === 'bAct') { cargar(true); }
@@ -197,10 +205,10 @@
     const d = e.target; if (!d.dataset || !d.dataset.pleg) return;
     const k = d.dataset.pleg, plegada = !d.open; if (!!S.plegadas[k] === plegada) return;
     S.plegadas[k] = plegada;
-    if (k === 'mapa' && !plegada) render();
+    if ((k === 'mapa' || k === 'lmapa') && !plegada) render();
   }, true);
   // Mayús+clic en el listado elige un tramo: que no seleccione además el texto de las filas
-  document.addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.it[data-inc]')) e.preventDefault(); });
+  document.addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.it[data-inc],.it[data-lab]')) e.preventDefault(); });
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'fEmp') { S.emp = t.value; render(); }
@@ -208,6 +216,8 @@
     else if (t.id === 'fTipo') { S.tipo = t.value; S.incMsg = null; render(); }
     else if (t.id === 'fEst') { S.est = t.value; S.incMsg = null; render(); }
     else if (t.id === 'fOrden') { S.orden = t.value; render(); }
+    else if (t.id === 'fLOrden') { S.lorden = t.value; render(); }
+    else if (t.id === 'chkTodasL') { S.labSels = t.checked ? G.labFiltradas().map(a => a.id) : []; S.labAncla = null; render(); }
     else if (t.id === 'chkTodas') { S.incSels = t.checked ? G.incFiltradas().map(i => i.id) : []; S.incAncla = null; S.incMsg = null; render(); }
     else if (t.dataset && t.dataset.capa) { G.capas[t.dataset.capa] = t.checked; G.repintarMapa(); }
   });
@@ -216,11 +226,11 @@
   document.addEventListener('input', e => {
     const t = e.target;
     if (t.id === 'incNota' || t.id === 'incEstado') S.borrador = { id: t.dataset.id, t: $('#incNota').value, est: $('#incEstado').value };
-    if (t.id !== 'fBuscar') return;
-    S.q = t.value; clearTimeout(tBuscar);
+    if (t.id !== 'fBuscar' && t.id !== 'fBuscarL') return;
+    const idB = t.id; S[idB === 'fBuscarL' ? 'lq' : 'q'] = t.value; clearTimeout(tBuscar);
     tBuscar = setTimeout(() => {
       const pos = t.selectionStart; render();
-      const n = $('#fBuscar'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* sin cursor */ } }
+      const n = $('#' + idB); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (err) { /* sin cursor */ } }
     }, 250);
   });
   document.addEventListener('submit', e => {
@@ -241,6 +251,6 @@
 
   // Refresco automático cada 2 minutos mientras se mira el día en curso
   // (no mientras se escribe una nota o una búsqueda, ni con el visor de adjuntos o el calendario abiertos)
-  setInterval(() => { if (!document.hidden && S.vista !== 'config' && !S.guardando && !S.cal && !document.querySelector('.visor') && !(document.activeElement && /^(incNota|fBuscar)$/.test(document.activeElement.id)) && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
+  setInterval(() => { if (!document.hidden && S.vista !== 'config' && !S.guardando && !S.cal && !document.querySelector('.visor') && !(document.activeElement && /^(incNota|fBuscar|fBuscarL)$/.test(document.activeElement.id)) && conectado() && G.periodo().includes(hoy())) cargar(false, true); }, 120000);
   ruta(); cargar(false);
 })();

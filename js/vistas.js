@@ -421,17 +421,135 @@
   };
 
   /* ---------- Labores ---------- */
+  // Registros de labor (sin «Inicio Jornada» ni pausas) que pasan los filtros (operario, labor y texto buscado), en el orden elegido
+  const ORDENES_LAB = { fecha: 'Fecha', operario: 'Operario', labor: 'Labor', duracion: 'Duración', distancia: 'Distancia', superficie: 'Superficie' };
+  G.labFiltradas = () => {
+    const s = S(), q = normal(s.lq).trim(), es = (a, b) => String(a || '').localeCompare(String(b || ''), 'es');
+    const l = s.data.acts.filter(a => !a.L.jornada && !a.L.pausa && (!s.emp || a.nombre === s.emp) && (!s.lab || a.L.k === s.lab)
+      && (!q || normal([a.nombre, a.actividad, a.L.n, a.estado].join(' ')).includes(q)));
+    // La más reciente primero; con otro criterio, dentro de cada grupo también la más reciente
+    const cmp = { operario: (a, b) => es(a.nombre, b.nombre), labor: (a, b) => es(a.L.n, b.L.n), duracion: (a, b) => b.trab - a.trab,
+      distancia: (a, b) => (b.km || 0) - (a.km || 0), superficie: (a, b) => (b.ha || 0) - (a.ha || 0) }[s.lorden];
+    return l.sort((a, b) => (cmp ? cmp(a, b) : 0) || b.t - a.t);
+  };
+  // Selección (una o varias filas), igual que en Incidencias
+  G.labSeleccionadas = () => { const l = G.labFiltradas(), q = S().labSels || []; const v = l.filter(a => q.includes(a.id)); return v.length ? v : l.slice(0, 1); };
+  const chipLab = a => /paus/i.test(a.estado) ? '<span class="chip c-av">En pausa</span>' : /curso/i.test(a.estado) ? '<span class="chip c-ok">En curso</span>' : '<span class="chip c-gr">Cerrada</span>';
+  const horario = a => G.hhmm(a.t) + '–' + G.hhmm(a.fin);
+  // Icono de la labor con su nombre corto debajo (como el tipo en Incidencias)
+  const icoLab = L => '<span class="tipoico" title="' + esc(L.n) + '"><img alt="" src="' + G.iconoLabor(L) + '"><b>' + esc(G.laborCorta(L)) + '</b></span>';
+
   function labores() {
-    const s = S(), D = s.data, f = { emp: s.emp, lab: s.lab }, labs = horasPorLabor(D, f);
-    if (!labs.length) return vacio('No hay labores registradas en el periodo.');
-    const emps = Array.from(new Set(D.acts.filter(a => !a.L.jornada && !a.L.pausa && (!f.emp || a.nombre === f.emp)).map(a => a.nombre)));
-    const cel = (e, k) => D.acts.filter(a => a.nombre === e && a.L.k === k).reduce((t, a) => t + a.trab, 0);
-    return '<div class="fila"><div class="card" style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px"><h2>Horas por labor</h2>' + barras(labs.map(l => [l.L.n, l.min, l.L.c, G.fmtMin(l.min)]), labs[0].min) + '</div>'
-      + '<div class="card" style="flex:2 1 560px;min-width:0;overflow-x:auto"><h2 style="margin-bottom:8px">Quién ha hecho qué</h2><table class="t"><thead><tr><th>Labor</th>' + emps.map(e => '<th class="r">' + esc(e) + '</th>').join('') + '<th class="r">Total</th><th class="r">Registros</th><th class="r">Distancia</th><th class="r">Superficie</th></tr></thead><tbody>'
-      + labs.map(l => '<tr><td><i class="dot" style="background:' + l.L.c + '"></i><b>' + esc(l.L.n) + '</b></td>' + emps.map(e => { const m = cel(e, l.L.k); return '<td class="r">' + (m ? G.fmtMin(m) : '—') + '</td>'; }).join('') + '<td class="r"><b>' + G.fmtMin(l.min) + '</b></td><td class="r">' + l.n + '</td><td class="r">' + G.fmtNum(l.km, 2) + ' km</td><td class="r">' + G.fmtNum(l.ha, 2) + ' ha</td></tr>').join('')
-      + '</tbody></table></div></div>'
-      + '<div class="card" style="border-style:dashed;background:#fafaf4"><span class="chip c-gr">Fase 2</span><h2 style="margin:8px 0 4px">Trabajo por parcela y subparcela</h2><span class="sub">El Registro central guarda posiciones GPS, no polígonos de parcela. Para repartir las horas por parcela hace falta importar las parcelas (Catastro/SIGPAC) al panel.</span></div>';
+    const s = S(), D = s.data, pl = s.plegadas || {};
+    const plegable = (k, titulo, cuerpo, clase) => '<details class="pleg' + (clase ? ' ' + clase : '') + '" data-pleg="' + k + '"' + (pl[k] ? '' : ' open') + '><summary><h2>' + titulo + '</h2></summary><div class="plegc">' + cuerpo + '</div></details>';
+    const op = (v, t, a) => '<option value="' + esc(v) + '"' + (v === a ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const opsLab = G.LABORES.filter(x => !x.pausa);
+    const barra = '<div class="barra">'
+      + '<label class="campo"><span>Ordenar por</span><select id="fLOrden">' + Object.keys(ORDENES_LAB).map(k => op(k, ORDENES_LAB[k], s.lorden)).join('') + '</select></label>'
+      + '<label class="campo"><span>Operario</span><select id="fEmp">' + op('', 'Todos', s.emp) + D.empleados.map(e => op(e, e, s.emp)).join('') + '</select></label>'
+      + '<label class="campo"><span>Labor</span><select id="fLab">' + op('', 'Todas', s.lab) + opsLab.map(x => op(x.k, x.n, s.lab)).join('') + '</select></label>'
+      + '<label class="campo buscar"><span>Buscar</span><input type="search" id="fBuscarL" placeholder="Operario, labor…" value="' + esc(s.lq) + '"></label></div>';
+
+    // Resumen de horas (plegable, encima del listado): barras por labor con su icono (al pulsar, filtra esa labor) y
+    // «Quién ha hecho qué» como mapa de calor (al pulsar una celda, ese operario en esa labor). Respeta Operario y Labor.
+    const f = { emp: s.emp, lab: s.lab }, labs = horasPorLabor(D, f);
+    const emps = Array.from(new Set(D.acts.filter(a => !a.L.jornada && !a.L.pausa && (!f.emp || a.nombre === f.emp)).map(a => a.nombre))).sort((a, b) => a.localeCompare(b, 'es'));
+    const cel = (e, k) => D.acts.filter(a => a.nombre === e && a.L.k === k && !a.L.pausa).reduce((t, a) => t + a.trab, 0);
+    const maxCel = Math.max(1, ...labs.flatMap(x => emps.map(e => cel(e, x.L.k))));
+    const barrasLab = labs.map(x => '<button type="button" class="barlab' + (s.lab === x.L.k ? ' on' : '') + '" data-flab="' + x.L.k + '" title="' + (s.lab === x.L.k ? 'Quitar el filtro de ' : 'Ver solo ') + esc(x.L.n) + '">'
+      + '<img alt="" src="' + G.iconoLabor(x.L) + '"><span class="bl"><span class="bn"><b>' + esc(x.L.n) + '</b><span class="num">' + G.fmtMin(x.min) + '</span></span>'
+      + '<span class="bar"><i style="width:' + Math.max(1.5, x.min / (labs[0].min || 1) * 100) + '%;background:' + x.L.c + '"></i></span></span></button>').join('');
+    const calor = m => m ? 'background:rgba(31,93,28,' + (0.08 + 0.55 * m / maxCel).toFixed(2) + ');' + (m / maxCel > .6 ? 'color:#fff;' : '') : '';
+    const tabla = '<div style="overflow-x:auto"><table class="t calor"><thead><tr><th>Labor</th>' + emps.map(e => '<th class="r">' + esc(e) + '</th>').join('') + '<th class="r">Total</th><th class="r">Registros</th><th class="r">Distancia</th><th class="r">Superficie</th></tr></thead><tbody>'
+      + labs.map(x => '<tr><td><span class="tdlab"><img alt="" src="' + G.iconoLabor(x.L) + '"><b>' + esc(x.L.n) + '</b></span></td>'
+        + emps.map(e => { const m = cel(e, x.L.k), on = s.emp === e && s.lab === x.L.k; return '<td class="r' + (m ? ' clic' : '') + (on ? ' on' : '') + '" style="' + calor(m) + '"' + (m ? ' data-fcel="' + esc(e) + '|' + x.L.k + '" title="' + (on ? 'Quitar el filtro' : 'Ver solo ' + esc(e) + ' · ' + esc(x.L.n)) + '"' : '') + '>' + (m ? G.fmtMin(m) : '—') + '</td>'; }).join('')
+        + '<td class="r"><b>' + G.fmtMin(x.min) + '</b></td><td class="r">' + x.n + '</td><td class="r">' + G.fmtNum(x.km, 2) + ' km</td><td class="r">' + G.fmtNum(x.ha, 2) + ' ha</td></tr>').join('')
+      + '</tbody></table></div>';
+    const resumenH = labs.length ? plegable('lres', 'Resumen de horas', '<div class="fila" style="margin:0"><div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:8px"><h3 class="lbl">Horas por labor</h3>' + barrasLab + '</div>'
+      + '<div style="flex:2 1 520px;min-width:0"><h3 class="lbl" style="margin-bottom:6px">Quién ha hecho qué</h3>' + tabla + '</div></div>', 'card') : '';
+
+    const l = G.labFiltradas(), sels = G.labSeleccionadas(), sel = sels[0], multi = sels.length > 1, enSel = new Set(sels.map(a => a.id));
+    const todas = l.length > 1 && sels.length === l.length;
+    const ficha = cuerpo => '<div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lcab">'
+      + (l.length > 1 ? '<input type="checkbox" class="selc" id="chkTodasL" title="Seleccionar todos" aria-label="Seleccionar todos los registros"' + (todas ? ' checked' : '') + ' data-ind="' + (multi && !todas ? 1 : 0) + '">' : '')
+      + '<h2>Listado Labores</h2><span class="chip c-gr num" aria-label="' + l.length + ' registros">' + l.length + '</span><span style="flex:1"></span>'
+      + '<button type="button" class="ico" id="bCsvL"' + (l.length ? '' : ' disabled') + ' title="' + (multi ? 'Exportar a Excel los ' + sels.length + ' registros seleccionados' : 'Exportar a Excel el registro seleccionado') + '" aria-label="Exportar a Excel los registros seleccionados">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
+    if (!D.acts.some(a => !a.L.jornada && !a.L.pausa)) return vacio('No hay labores registradas en el periodo.');
+    if (!l.length) return barra + resumenH + '<div class="fila">' + ficha(vacio('Ningún registro cumple los filtros.')) + '</div>';
+
+    // Fila: casilla, número (con el color de la labor, el mismo que su recorrido en el mapa), icono de la labor, operario y horario,
+    // duración, superficie y estado
+    const item = (a, k) => '<div class="it clic' + (enSel.has(a.id) ? ' sel' : '') + '" data-lab="' + esc(a.id) + '"><input type="checkbox" class="selc" aria-label="Seleccionar el registro ' + (k + 1) + '"' + (enSel.has(a.id) ? ' checked' : '') + '>'
+      + '<span class="nro num" style="background:' + a.L.c + '">' + (k + 1) + '</span>' + icoLab(a.L)
+      + '<div class="itx" style="flex:1;min-width:0"><div style="font-weight:700">' + esc(a.nombre) + '</div><div class="sub">' + G.diaCorto(a.dia) + ' · ' + horario(a) + (a.km ? ' · ' + G.fmtNum(a.km, 2) + ' km' : '') + '</div></div>'
+      + '<span class="chip c-gr num" title="Tiempo trabajado">' + G.fmtMin(a.trab) + '</span>' + (a.ha ? '<span class="chip c-gr num ha" title="Superficie">' + G.fmtNum(a.ha, 2) + ' ha</span>' : '') + chipLab(a) + '</div>';
+
+    // Ficha de detalle: con varios registros, los datos comunes o «Varios/Varias» y las sumas
+    const uno = fn => { const v = new Set(sels.map(fn)); return v.size === 1 ? fn(sel) : null; };
+    const labC = uno(a => a.L.k) ? sel.L : null, nomC = uno(a => a.nombre), diaC = uno(a => a.dia), estC = uno(a => chipLab(a));
+    const suma = fn => sels.reduce((t, a) => t + (fn(a) || 0), 0);
+    const trab = suma(a => a.trab), pausa = suma(a => a.pausa), km = suma(a => a.km), ha = suma(a => a.ha), vel = trab ? km / (trab / 60) : 0;
+    const dato = (t, v) => '<div><span class="sub">' + t + '</span><br><b class="num">' + v + '</b></div>';
+    const conGps = sels.filter(a => (D.pts.get(a.id) || []).length);
+    const leyenda = Array.from(new Map(l.map(a => [a.L.k, a.L])).values()).map(L => '<span><i class="lin" style="background:' + L.c + '"></i>' + esc(L.n) + '</span>').join('')
+      + '<span class="bordes"><i class="pin ini"></i>Inicio <i class="pin fin"></i>Fin</span>';
+    const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
+      + '<div>' + (labC || estC ? '<div class="barra" style="gap:8px">' + (labC ? '<span class="lbl">' + esc(labC.n) + '</span>' : '') + (estC || '') + '</div>' : '')
+      + '<div style="display:flex;align-items:center;gap:12px;margin-top:6px">' + (labC ? '<img class="icodet" alt="" src="' + G.iconoLabor(labC) + '">' : '')
+      + '<h2 style="font-size:20px;flex:1;min-width:0">' + (multi ? sels.length + ' registros seleccionados' : esc(sel.nombre) + ' · ' + esc(sel.L.n)) + '</h2></div></div>'
+      + plegable('ldat', 'Resumen', '<div class="datos">' + dato('Operario', esc(nomC || 'Varios')) + dato('Fecha', diaC ? G.diaCorto(diaC) : 'Varias')
+        + (multi ? '' : dato('Horario', horario(sel))) + dato(multi ? 'Tiempo trabajado (suma)' : 'Tiempo trabajado', G.fmtMin(trab)) + dato('Pausas', pausa ? G.fmtMin(pausa) : '—')
+        + dato('Distancia', G.fmtNum(km, 2) + ' km') + dato('Superficie', G.fmtNum(ha, 2) + ' ha') + dato('Velocidad media', vel ? G.fmtNum(vel, 1) + ' km/h' : '—')
+        + dato('Puntos GPS', suma(a => (D.pts.get(a.id) || []).length)) + (multi || sel.exacta ? '' : '<div class="sub" style="flex-basis:100%">La duración se estima con el último punto GPS.</div>') + '</div>')
+      + plegable('lmapa', 'Mapa', conGps.length ? '<div id="mapa" class="mapa mini" aria-label="Recorrido de ' + (multi ? 'los registros seleccionados' : 'la labor') + '"></div><div class="leyenda">' + leyenda + '</div>' : '<span class="sub">Sin puntos GPS.</span>')
+      + '</div>';
+    return barra + resumenH + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
   }
+
+  // Mapa del detalle de Labores: los recorridos elegidos, gruesos y con su inicio y fin; los demás del listado, finos y atenuados
+  // (clic: elegir solo ese; Ctrl/Mayús+clic: sumarlo). Encuadra lo elegido.
+  function mapaLab() {
+    const el = document.getElementById('mapa'); if (!el) return;
+    G.destruirMapa();
+    if (el.closest('details:not([open])')) return; // sección «Mapa» plegada: se pinta al desplegarla
+    const D = S().data, l = G.labFiltradas(), sels = G.labSeleccionadas(), enSel = new Set(sels.map(a => a.id));
+    const m = L.map(el, { scrollWheelZoom: false }); mapaActual = m;
+    const fondos = crearFondos();
+    let fondo = 'Aérea'; try { fondo = localStorage.getItem('gea.panel.fondo') || fondo; } catch (e) { /* sin almacenamiento */ }
+    (fondos[fondo] || fondos['Aérea']).addTo(m);
+    L.control.layers(fondos, null, { position: 'topright' }).addTo(m);
+    const linea = a => (D.pts.get(a.id) || []).map(p => [p.lat, p.lon]);
+    l.forEach((a, k) => {
+      if (enSel.has(a.id)) return; const ll = linea(a); if (!ll.length) return;
+      L.polyline(ll, { color: a.L.c, weight: 3, opacity: sels.length ? .35 : .8 }).bindTooltip((k + 1) + '. ' + esc(a.nombre) + ' · ' + esc(a.L.n) + ' · ' + horario(a))
+        .on('click', e => { const o = e.originalEvent || {}; G.elegirLab(a.id, o.ctrlKey || o.metaKey || o.shiftKey); }).addTo(m);
+    });
+    const b = [];
+    sels.forEach(a => {
+      const ll = linea(a), k = l.indexOf(a) + 1; if (!ll.length) return; b.push(...ll);
+      L.polyline(ll, { color: '#fff', weight: 9, opacity: .85, interactive: false }).addTo(m);
+      L.polyline(ll, { color: a.L.c, weight: 5, opacity: 1 }).bindTooltip(k + '. ' + esc(a.nombre) + ' · ' + esc(a.L.n) + ' · ' + horario(a)).addTo(m);
+      const pin = (p, cls, t) => L.marker(p, { zIndexOffset: 900, icon: L.divIcon({ className: 'mk', html: '<i class="pin ' + cls + '">' + (cls === 'ini' ? k : '') + '</i>', iconSize: [20, 20], iconAnchor: [10, 10] }) }).bindTooltip(t).addTo(m);
+      pin(ll[0], 'ini', k + '. Inicio ' + G.hhmm(a.t)); if (ll.length > 1) pin(ll[ll.length - 1], 'fin', k + '. Fin ' + G.hhmm(a.fin));
+    });
+    if (b.length > 1) m.fitBounds(L.latLngBounds(b), { padding: [30, 30], maxZoom: 18 }); else if (b.length) m.setView(b[0], 17); else m.setView(BASE, 15);
+    setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 80);
+  }
+
+  // Exportar a Excel (CSV) los registros de labor seleccionados, en el orden del listado
+  G.exportarLab = () => {
+    const todas = G.labFiltradas(), l = G.labSeleccionadas(), p = G.periodo(), D = S().data;
+    const cel = v => { let t = String(v == null ? '' : v); if (/^[=+\-@]/.test(t) && !/^-?\d/.test(t)) t = "'" + t; return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const dec = (n, d) => n == null ? '' : Number(n).toFixed(d).replace('.', ',');
+    const cab = ['Nº', 'Fecha', 'Inicio', 'Fin', 'Operario', 'Labor', 'Estado', 'Tiempo trabajado (min)', 'Tiempo trabajado', 'Pausas (min)', 'Distancia (km)', 'Superficie (ha)', 'Puntos GPS', 'Duración exacta', 'Ver inicio en mapa'];
+    const filas = l.map(a => { const pt = (D.pts.get(a.id) || [])[0];
+      return [todas.indexOf(a) + 1, a.dia.split('-').reverse().join('/'), G.hhmm(a.t), G.hhmm(a.fin), a.nombre, a.L.n, a.estado, Math.round(a.trab), G.fmtMin(a.trab), Math.round(a.pausa || 0), dec(a.km || 0, 3), dec(a.ha || 0, 4),
+        (D.pts.get(a.id) || []).length, a.exacta ? 'Sí' : 'No (estimada con el GPS)', pt ? 'https://maps.google.com/?q=' + pt.lat + ',' + pt.lon : '']; });
+    const txt = '﻿' + [cab].concat(filas).map(f => f.map(cel).join(';')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'labores_' + p[0] + (p.length > 1 ? '_' + p[p.length - 1] : '') + (l.length === 1 ? '_' + l[0].nombre.replace(/[^\wÀ-ÿ-]+/g, '-') + '_' + G.hhmm(l[0].t).replace(':', 'h') : '_' + l.length + '-seleccionados') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
 
   /* ---------- Configuración ---------- */
   function config() {
@@ -452,7 +570,7 @@
     mapa: { t: 'Dónde se ha trabajado', f: mapa, post: () => pintarMapa(document.getElementById('mapa'), S().data, { emp: S().emp, lab: S().lab, dia: refDia() }, capasPor) },
     personal: { t: 'Jornales y horas', f: personal },
     incidencias: { t: 'Incidencias', f: incidencias, post: miniMapa },
-    labores: { t: 'Labores', f: labores },
+    labores: { t: 'Labores', f: labores, post: mapaLab },
     config: { t: 'Configuración', f: config, sinDatos: true }
   };
   G.repintarMapa = () => pintarMapa(document.getElementById('mapa'), S().data, { emp: S().emp, lab: S().lab, dia: refDia() }, capasPor);
