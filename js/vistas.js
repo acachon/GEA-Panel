@@ -230,13 +230,15 @@
     const cmp = { operario: (a, b) => es(a.nombre, b.nombre), tipo: (a, b) => es(a.tipo, b.tipo), estado: (a, b) => (a.estado === 'Resuelta') - (b.estado === 'Resuelta') }[s.orden];
     return cmp ? l.sort((a, b) => cmp(a, b) || b.t - a.t) : l;
   };
-  G.incSeleccionada = () => { const l = G.incFiltradas(); return l.find(i => i.id === S().incSel) || l[0]; };
+  // Selección (una o varias filas): las elegidas que siguen visibles con los filtros, en el orden del listado; si no hay ninguna, la primera
+  G.incSeleccionadas = () => { const l = G.incFiltradas(), q = S().incSels || []; const v = l.filter(i => q.includes(i.id)); return v.length ? v : l.slice(0, 1); };
+  G.incSeleccionada = () => G.incSeleccionadas()[0];
   const ICO_EXP = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/></svg>';
 
   function incidencias() {
     const s = S(), D = s.data;
     const tipos = Array.from(new Set(D.inc.map(i => i.tipo))).sort((a, b) => a.localeCompare(b, 'es'));
-    const l = G.incFiltradas(), sel = G.incSeleccionada();
+    const l = G.incFiltradas(), sels = G.incSeleccionadas(), sel = sels[0], multi = sels.length > 1, enSel = new Set(sels.map(i => i.id));
     const op = (v, t, a) => '<option value="' + esc(v) + '"' + (v === a ? ' selected' : '') + '>' + esc(t) + '</option>';
     const msg = s.incMsg ? '<div class="aviso ' + (s.incMsg.ok ? 'ok' : 'err') + '" role="status">' + esc(s.incMsg.t) + '</div>' : '';
     const barra = '<div class="barra">'
@@ -245,13 +247,18 @@
       + '<label class="campo"><span>Tipo</span><select id="fTipo">' + op('', 'Todos', s.tipo) + tipos.map(t => op(t, t, s.tipo)).join('') + '</select></label>'
       + '<label class="campo buscar"><span>Buscar</span><input type="search" id="fBuscar" placeholder="Comentario, operario, nota…" value="' + esc(s.q) + '"></label></div>';
     // Ficha del listado: título, contador y, a la derecha, el icono para exportar a Excel
-    const ficha = cuerpo => '<div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lcab"><h2>Listado Incidencias</h2><span class="chip c-gr num" aria-label="' + l.length + ' incidencias">' + l.length + '</span><span style="flex:1"></span>'
+    // Casilla «todas»: marcada si están todas elegidas, a medias (indeterminada) si hay varias pero no todas
+    const todas = l.length > 1 && sels.length === l.length;
+    const ficha = cuerpo => '<div class="card" style="flex:1.2 1 440px;min-width:0"><div class="lcab">'
+      + (l.length > 1 ? '<input type="checkbox" class="selc" id="chkTodas" title="Seleccionar todas" aria-label="Seleccionar todas las incidencias"' + (todas ? ' checked' : '') + ' data-ind="' + (multi && !todas ? 1 : 0) + '">' : '')
+      + '<h2>Listado Incidencias</h2><span class="chip c-gr num" aria-label="' + l.length + ' incidencias">' + l.length + '</span><span style="flex:1"></span>'
       + '<button type="button" class="ico" id="bCsv"' + (l.length ? '' : ' disabled') + ' title="Exportar a Excel" aria-label="Exportar a Excel">' + ICO_EXP + '</button></div>' + cuerpo + '</div>';
     if (!l.length) return barra + msg + '<div class="fila">' + ficha(vacio(D.inc.length ? 'Ninguna incidencia cumple los filtros.' : 'No hay incidencias en el periodo.')) + '</div>';
 
     // El tipo ocupa siempre el mismo ancho: si el nombre es largo se recorta con «…» (completo al pasar el ratón)
     // El número (con el color del tipo) es el mismo que lleva su triángulo en el mapa
-    const item = (i, k) => '<div class="it clic' + (i.id === sel.id ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Número ' + (k + 1) + ' en el mapa">' + (k + 1) + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
+    // Casilla de cada fila: suma o quita esa incidencia de la selección (también Ctrl+clic; Mayús+clic elige un tramo)
+    const item = (i, k) => '<div class="it clic' + (enSel.has(i.id) ? ' sel' : '') + (i.estado === 'Resuelta' ? ' res' : '') + '" data-inc="' + esc(i.id) + '"><input type="checkbox" class="selc" aria-label="Seleccionar la incidencia ' + (k + 1) + '"' + (enSel.has(i.id) ? ' checked' : '') + '><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '" aria-label="Número ' + (k + 1) + ' en el mapa">' + (k + 1) + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(i.comentario || 'Sin comentario') + '</div><div class="sub">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</div></div>'
       + ((i.adjuntos || []).length ? '<span class="chip c-gr" title="Adjuntos">' + i.adjuntos.length + ' adj.</span>' : '') + chipEst(i.estado) + '</div>';
     // Adjuntos: miniatura de las fotos (si Drive la da) e icono para vídeos y audios; al pulsar se abren en el visor
     const va = adjVisibles(sel);
@@ -262,7 +269,9 @@
         : '<button type="button" class="adj" data-adj="' + k + '" title="Ver ' + esc(a.nombre) + '">' + (ICO_ADJ[a.tipo] || ICO_ADJ.foto) + img + '<span>' + t + '</span></button>';
     };
     // Seguimiento: historial «[DD/MM/AAAA] [Usuario] comentario» (una línea por comentario guardado), comentario nuevo y estado
-    const borr = s.borrador && s.borrador.id === sel.id ? s.borrador : { t: '', est: sel.estado };
+    // Con varias elegidas, el comentario se añade a cada una y el estado elegido pasa a ser el de todas («Sin cambiar» si no coinciden)
+    const clave = sels.map(i => i.id).join('|'), comun = new Set(sels.map(i => i.estado)).size === 1 ? sel.estado : '';
+    const borr = s.borrador && s.borrador.id === clave ? s.borrador : { t: '', est: comun };
     const res = sel.estado === 'Resuelta', dis = s.guardando ? ' disabled' : '';
     const hist = String(sel.nota || '').split('\n').filter(x => x.trim()).map(x => {
       const m = x.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*\[([^\]]*)\]\s*(.*)$/);
@@ -270,11 +279,15 @@
     }).join('');
     const usuario = G.usuario();
     const seguimiento = '<div class="gestion"><h2 style="font-size:14px">Seguimiento</h2>'
-      + (hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
-      + '<div class="segfila"><textarea id="incNota" data-id="' + esc(sel.id) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
-      + '<label class="campo segest"><span>Estado</span><select id="incEstado" data-id="' + esc(sel.id) + '"' + dis + '><option' + (borr.est !== 'Resuelta' ? ' selected' : '') + '>Pendiente</option><option' + (borr.est === 'Resuelta' ? ' selected' : '') + '>Resuelta</option></select></label></div>'
+      + (multi ? '<span class="sub">El comentario se añadirá al seguimiento de <b>cada una de las ' + sels.length + ' incidencias</b>, y el estado que elijas será el de todas.</span>'
+        : hist ? '<ol class="hist">' + hist + '</ol>' : '<span class="sub">Todavía no hay comentarios de seguimiento.</span>')
+      + '<div class="segfila"><textarea id="incNota" data-id="' + esc(clave) + '" rows="2" maxlength="1000" aria-label="Comentario de seguimiento" placeholder="Añade un comentario: qué se ha hecho, quién se encarga…"' + dis + '>' + esc(borr.t) + '</textarea>'
+      + '<label class="campo segest"><span>Estado</span><select id="incEstado" data-id="' + esc(clave) + '"' + dis + '>'
+      + (comun ? '' : '<option value=""' + (borr.est === '' ? ' selected' : '') + '>Sin cambiar</option>')
+      + '<option' + (borr.est === 'Pendiente' ? ' selected' : '') + '>Pendiente</option><option' + (borr.est === 'Resuelta' ? ' selected' : '') + '>Resuelta</option></select></label></div>'
       + '<div class="barra"><span class="sub">Firmará: <b>' + esc(usuario) + '</b> · <a href="#config">cambiar</a></span>'
-      + '<span style="flex:1"></span>' + (s.guardando ? '<span class="sub">Guardando…</span>' : '') + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(sel.id) + '"' + dis + '>Actualizar</button></div></div>';
+      + '<span style="flex:1"></span>' + (s.guardando ? '<span class="sub" id="segProg">' + esc(typeof s.guardando === 'string' ? s.guardando : 'Guardando…') + '</span>' : '')
+      + '<button type="button" class="btn pri" id="bSeg" data-id="' + esc(clave) + '"' + dis + '>' + (multi ? 'Actualizar las ' + sels.length : 'Actualizar') + '</button></div></div>';
     const detalle = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
       + '<div><div class="barra" style="gap:8px"><span class="lbl">' + esc(sel.tipo) + '</span>' + chipEst(sel.estado) + '</div><h2 style="font-size:20px;margin-top:6px">' + esc(sel.comentario || 'Sin comentario') + '</h2></div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px"><div><span class="sub">Registrada por</span><br><b>' + esc(sel.nombre) + '</b></div><div><span class="sub">Fecha y hora</span><br><b class="num">' + G.diaCorto(sel.dia) + ' · ' + G.hhmm(sel.t) + '</b></div>'
@@ -284,7 +297,13 @@
       + ((sel.adjuntos || []).length ? '<div class="carr"><button type="button" class="carrb" data-carr="-1" aria-label="Adjuntos anteriores" hidden>‹</button><div class="adjs">' + sel.adjuntos.map(tesela).join('') + '</div><button type="button" class="carrb" data-carr="1" aria-label="Más adjuntos" hidden>›</button></div>' : '<span class="sub">Sin adjuntos.</span>') + '</div>'
       + (sel.lat != null ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de la incidencia"></div>' : '<span class="sub">Sin posición GPS.</span>')
       + seguimiento + '</div>';
-    return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + detalle + '</div>';
+    // Varias elegidas: resumen de cada una (al pulsarla se queda solo esa), todas en el mapa y un seguimiento común
+    const detalleMulti = '<div class="card" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:14px">'
+      + '<div class="barra" style="gap:8px"><h2 style="font-size:20px">' + sels.length + ' incidencias seleccionadas</h2><span style="flex:1"></span><button type="button" class="btn" id="bQuitarSel">Quitar selección</button></div>'
+      + '<div class="selchips">' + sels.map(i => { const k = l.indexOf(i) + 1; return '<button type="button" class="selchip" data-inc="' + esc(i.id) + '" title="Ver solo esta"><span class="nro num" style="background:' + G.colorTipo(i.tipo) + '">' + k + '</span><span class="chip c-gr tipo" title="' + esc(i.tipo) + '">' + esc(i.tipo) + '</span><span class="scn">' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia) + ' ' + G.hhmm(i.t) + '</span>' + chipEst(i.estado) + '</button>'; }).join('') + '</div>'
+      + (sels.some(i => i.lat != null) ? '<div id="mapa" class="mapa mini" aria-label="Ubicación de las incidencias seleccionadas"></div>' : '<span class="sub">Ninguna tiene posición GPS.</span>')
+      + seguimiento + '</div>';
+    return barra + msg + '<div class="fila">' + ficha('<div class="lista larga">' + l.map(item).join('') + '</div>') + (multi ? detalleMulti : detalle) + '</div>';
   }
 
   // Mapa pequeño del detalle: la incidencia elegida y, más pequeñas, las demás del listado (al pulsarlas se eligen)
@@ -296,8 +315,9 @@
   };
   const ICO_GMAPS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
   function miniMapa() {
-    const el = document.getElementById('mapa'), sel = G.incSeleccionada();
-    if (!el || !sel || sel.lat == null) return;
+    const el = document.getElementById('mapa'), l = G.incFiltradas(), sels = G.incSeleccionadas().filter(i => i.lat != null), sel = sels[0];
+    if (!el || !sel) return;
+    const enSel = new Set(sels.map(i => i.id));
     G.destruirMapa();
     const m = L.map(el, { scrollWheelZoom: false }); mapaActual = m;
     const fondos = crearFondos();
@@ -311,14 +331,20 @@
       L.DomEvent.disableClickPropagation(c); return c; } });
     new GM().addTo(m);
     // Cada incidencia con su número del listado (mismo orden y filtros)
-    G.incFiltradas().forEach((i, k) => {
-      if (i.lat == null || i.id === sel.id) return;
-      L.marker([i.lat, i.lon], { icon: triangulo(i, k + 1, false) })
-        .bindTooltip((k + 1) + '. ' + esc(i.tipo) + ' · ' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia)).on('click', () => { S().incSel = i.id; S().incMsg = null; G.render(); }).addTo(m);
+    // Las elegidas, grandes y con borde lima; las demás, pequeñas y atenuadas (clic: elegir solo esa; Ctrl/Mayús+clic: sumarla)
+    l.forEach((i, k) => {
+      if (i.lat == null || enSel.has(i.id)) return;
+      L.marker([i.lat, i.lon], { icon: triangulo(i, k + 1, false), opacity: sels.length > 1 ? .6 : 1 })
+        .bindTooltip((k + 1) + '. ' + esc(i.tipo) + ' · ' + esc(i.nombre) + ' · ' + G.diaCorto(i.dia))
+        .on('click', e => { const o = e.originalEvent || {}; G.elegirInc(i.id, o.ctrlKey || o.metaKey || o.shiftKey); }).addTo(m);
     });
-    if (sel.precision && sel.precision <= 200) L.circle([sel.lat, sel.lon], { radius: sel.precision, color: G.colorTipo(sel.tipo), weight: 1, fillOpacity: .15, interactive: false }).addTo(m);
-    L.marker([sel.lat, sel.lon], { zIndexOffset: 1000, icon: triangulo(sel, G.incFiltradas().indexOf(sel) + 1, true) }).bindTooltip(esc(sel.tipo)).addTo(m);
-    m.setView([sel.lat, sel.lon], 17);
+    if (sels.length === 1 && sel.precision && sel.precision <= 200) L.circle([sel.lat, sel.lon], { radius: sel.precision, color: G.colorTipo(sel.tipo), weight: 1, fillOpacity: .15, interactive: false }).addTo(m);
+    sels.forEach(i => {
+      const k = l.indexOf(i) + 1;
+      L.marker([i.lat, i.lon], { zIndexOffset: 1000, icon: triangulo(i, k, true) }).bindTooltip(k + '. ' + esc(i.tipo) + ' · ' + esc(i.nombre)).addTo(m);
+    });
+    if (sels.length === 1) m.setView([sel.lat, sel.lon], 17);
+    else m.fitBounds(L.latLngBounds(sels.map(i => [i.lat, i.lon])), { padding: [36, 36], maxZoom: 18 });
     setTimeout(() => { if (mapaActual === m) m.invalidateSize(); }, 80);
   }
 

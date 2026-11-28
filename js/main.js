@@ -6,7 +6,7 @@
   const leerCfg = () => { try { return Object.assign({}, porDefecto, JSON.parse(localStorage.getItem(CLAVE_LS) || '{}')); } catch (e) { return Object.assign({}, porDefecto); } };
   const guardarCfg = c => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(c)); } catch (e) { /* sin almacenamiento: queda solo en memoria */ } };
 
-  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSel: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
+  const S = G.state = { vista: 'resumen', modo: 'hoy', dia: hoy(), emp: '', lab: '', tipo: '', est: '', q: '', orden: 'fecha', dias: [], cal: null, incSels: [], incAncla: null, incMsg: null, borrador: null, guardando: false, data: null, cargando: false, error: null, actualizado: null, cfg: leerCfg() };
   const MAX_DIAS = 92; // días que se pueden elegir a la vez en el calendario
   const ultimos = n => { const h = hoy(); return Array.from({ length: n }, (_, i) => G.addDays(h, i - n + 1)); };
   G.periodo = () => {
@@ -111,29 +111,58 @@
     $('#vista').innerHTML = h;
     $('#main').classList.toggle('cargando', S.cargando && !!S.data);
     if (hayMapa && document.getElementById('mapa') && window.L) v.post();
+    const ct = $('#chkTodas'); if (ct) ct.indeterminate = ct.dataset.ind === '1';
     G.carrusel();
   }
 
   G.render = render;
 
-  // Seguimiento de la incidencia elegida («Actualizar»): guarda el estado y añade el comentario, firmado con fecha y usuario
-  async function guardarSeguimiento(id) {
-    const i = S.data && S.data.inc.find(x => x.id === id); if (!i) return;
-    const txt = ($('#incNota').value || '').replace(/\s+/g, ' ').trim(), est = $('#incEstado').value, usuario = G.usuario();
-    const aviso = t => { S.borrador = { id, t: $('#incNota').value, est }; S.incMsg = { ok: false, t }; render(); };
-    const cambio = est !== i.estado;
-    if (!txt && !cambio) return aviso('No hay nada que guardar: escribe un comentario o cambia el estado.');
-    const entrada = (cambio ? (est === 'Resuelta' ? 'Marcada como resuelta.' : 'Vuelve a pendiente.') : '') + (txt ? (cambio ? ' ' : '') + txt : '');
+  // Elegir incidencias en el listado o el mapa: clic = solo esa; sumar (casilla, Ctrl/Cmd) = añadir o quitar; tramo (Mayús) = desde la última pulsada
+  G.elegirInc = (id, sumar, tramo) => {
+    const l = G.incFiltradas().map(i => i.id), act = G.incSeleccionadas().map(i => i.id);
+    if (tramo && S.incAncla && l.includes(S.incAncla)) {
+      const a = l.indexOf(S.incAncla), b = l.indexOf(id);
+      S.incSels = Array.from(new Set(act.concat(l.slice(Math.min(a, b), Math.max(a, b) + 1))));
+    } else if (sumar) {
+      S.incSels = act.includes(id) ? act.filter(x => x !== id) : act.concat(id);
+      if (!S.incSels.length) S.incSels = [id];
+      S.incAncla = id;
+    } else { S.incSels = [id]; S.incAncla = id; }
+    S.incMsg = null; render();
+  };
+
+  // Seguimiento («Actualizar») de una o varias incidencias: a cada una se le añade el comentario, firmado con fecha y usuario,
+  // y el estado elegido pasa a ser el suyo. El servicio guarda una incidencia por llamada: se envían una tras otra.
+  async function guardarSeguimiento(clave) {
+    const ids = String(clave || '').split('|'), lista = ids.map(id => S.data && S.data.inc.find(x => x.id === id)).filter(Boolean); if (!lista.length) return;
+    const txt = ($('#incNota').value || '').replace(/\s+/g, ' ').trim(), elegido = $('#incEstado').value, usuario = G.usuario();
+    const aviso = t => { S.borrador = { id: clave, t: $('#incNota').value, est: elegido }; S.incMsg = { ok: false, t }; render(); };
     const d = new Date(), fecha = [d.getDate(), d.getMonth() + 1].map(n => String(n).padStart(2, '0')).join('/') + '/' + d.getFullYear();
-    const nota = (i.nota ? i.nota + '\n' : '') + '[' + fecha + '] [' + usuario + '] ' + entrada;
-    S.borrador = { id, t: txt, est }; S.guardando = true; S.incMsg = null; render();
-    try {
-      const r = await G.api.estado(S.cfg, id, est, { entrada, usuario, nota });
-      Object.assign(i, { estado: r.estado, nota: r.nota, fechaEstado: r.fechaEstado });
-      S.borrador = null; S.incSel = id;
-      S.incMsg = { ok: true, t: 'Seguimiento guardado: «' + (i.comentario || i.tipo) + '» queda ' + (r.estado === 'Resuelta' ? 'resuelta.' : 'pendiente.') };
-    } catch (e) { S.incMsg = { ok: false, t: 'No se pudo guardar: ' + ((e && e.message) || e) }; }
-    S.guardando = false; render();
+    const tareas = lista.map(i => {
+      const est = elegido || i.estado, cambio = est !== i.estado;
+      if (!txt && !cambio) return null;
+      const entrada = (cambio ? (est === 'Resuelta' ? 'Marcada como resuelta.' : 'Vuelve a pendiente.') : '') + (txt ? (cambio ? ' ' : '') + txt : '');
+      return { i, est, entrada, nota: (i.nota ? i.nota + '\n' : '') + '[' + fecha + '] [' + usuario + '] ' + entrada };
+    }).filter(Boolean);
+    if (!tareas.length) return aviso('No hay nada que guardar: escribe un comentario o cambia el estado.');
+    const n = tareas.length, varias = lista.length > 1, fallos = [];
+    S.borrador = { id: clave, t: txt, est: elegido }; S.guardando = varias ? 'Guardando 1 de ' + n + '…' : true; S.incMsg = null; render();
+    for (let k = 0; k < n; k++) {
+      const { i, est, entrada, nota } = tareas[k], p = $('#segProg');
+      if (p && varias) p.textContent = 'Guardando ' + (k + 1) + ' de ' + n + '…';
+      try {
+        const r = await G.api.estado(S.cfg, i.id, est, { entrada, usuario, nota });
+        Object.assign(i, { estado: r.estado, nota: r.nota, fechaEstado: r.fechaEstado });
+      } catch (e) { fallos.push((i.comentario || i.tipo) + ': ' + ((e && e.message) || e)); }
+    }
+    S.guardando = false;
+    if (!fallos.length) {
+      S.borrador = null;
+      const i = tareas[0].i;
+      S.incMsg = { ok: true, t: varias ? 'Seguimiento guardado en ' + n + ' incidencia' + (n > 1 ? 's' : '') + (elegido ? '; todas quedan ' + (elegido === 'Resuelta' ? 'resueltas.' : 'pendientes.') : '.')
+        : 'Seguimiento guardado: «' + (i.comentario || i.tipo) + '» queda ' + (i.estado === 'Resuelta' ? 'resuelta.' : 'pendiente.') };
+    } else S.incMsg = { ok: false, t: (n - fallos.length ? 'Guardadas ' + (n - fallos.length) + ' de ' + n + '. ' : '') + 'No se pudo guardar ' + (fallos.length > 1 ? fallos.length + ' incidencias: ' : '') + fallos.join(' · ') };
+    render();
   }
 
   function ruta() { const v = (location.hash || '#resumen').slice(1); S.vista = G.vistas[v] ? v : 'resumen'; render(); }
@@ -143,9 +172,10 @@
     const tc = e.target.closest('#bCal,[data-cald],[data-calm],[data-calx]');
     if (tc) { clicCal(tc, e); return; }
     if (S.cal && !e.target.closest('.cal')) { S.cal = null; pintarCal(); }
-    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],#bSeg,#bAct,#bProbar,#bCsv'); if (!t) return;
+    const t = e.target.closest('[data-modo],[data-inc],[data-ir],[data-demo],[data-adj],[data-carr],#bSeg,#bAct,#bProbar,#bCsv,#bQuitarSel'); if (!t) return;
     if (t.dataset.modo) { S.modo = t.dataset.modo; cargar(false); }
-    else if (t.dataset.inc) { S.incSel = t.dataset.inc; S.incMsg = null; render(); }
+    else if (t.dataset.inc) G.elegirInc(t.dataset.inc, e.target.classList.contains('selc') || e.ctrlKey || e.metaKey, e.shiftKey);
+    else if (t.id === 'bQuitarSel') { S.incSels = []; S.incAncla = null; S.borrador = null; S.incMsg = null; render(); }
     else if (t.id === 'bSeg') { if (!S.guardando) guardarSeguimiento(t.dataset.id); }
     else if (t.dataset.adj) G.abrirVisor(Number(t.dataset.adj));
     else if (t.dataset.carr) G.carrusel(Number(t.dataset.carr));
@@ -155,6 +185,8 @@
     else if (t.id === 'bAct') { cargar(true); }
     else if (t.id === 'bProbar') probar();
   });
+  // Mayús+clic en el listado elige un tramo: que no seleccione además el texto de las filas
+  document.addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.it[data-inc]')) e.preventDefault(); });
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'fEmp') { S.emp = t.value; render(); }
@@ -162,6 +194,7 @@
     else if (t.id === 'fTipo') { S.tipo = t.value; S.incMsg = null; render(); }
     else if (t.id === 'fEst') { S.est = t.value; S.incMsg = null; render(); }
     else if (t.id === 'fOrden') { S.orden = t.value; render(); }
+    else if (t.id === 'chkTodas') { S.incSels = t.checked ? G.incFiltradas().map(i => i.id) : []; S.incAncla = null; S.incMsg = null; render(); }
     else if (t.dataset && t.dataset.capa) { G.capas[t.dataset.capa] = t.checked; G.repintarMapa(); }
   });
   // Buscar en Incidencias: filtra mientras se escribe sin perder el cursor; la nota se guarda como borrador
